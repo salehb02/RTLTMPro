@@ -54,22 +54,29 @@ namespace RTLTMPro
 
             base.OnInspectorGUI();
 
-            foldout = EditorGUILayout.Foldout(foldout, "RTL Settings", TMP_UIStyleManager.boldFoldout);
+            DrawRtlSettings();
+
+            if (m_HavePropertiesChanged)
+                OnChanged();
+
+            serializedObject.ApplyModifiedProperties();
+        }
+
+        private void DrawRtlSettings()
+        {
+            Rect rect = EditorGUILayout.GetControlRect(false, 24);
+
+            if (GUI.Button(rect, new GUIContent("<b>RTL Settings</b>"), TMP_UIStyleManager.sectionHeader))
+                foldout = !foldout;
+
+            GUI.Label(rect, (foldout ? k_UiStateLabel[0] : k_UiStateLabel[1]), TMP_UIStyleManager.rightLabel);
             if (foldout)
             {
                 DrawOptions();
 
                 if (GUILayout.Button("Re-Fix"))
                     m_HavePropertiesChanged = true;
-
-                if (EditorGUI.EndChangeCheck())
-                    m_HavePropertiesChanged = true;
             }
-
-            if (m_HavePropertiesChanged)
-                OnChanged();
-
-            serializedObject.ApplyModifiedProperties();
         }
 
         protected void OnChanged()
@@ -83,21 +90,14 @@ namespace RTLTMPro
 
         protected virtual void DrawOptions()
         {
-            EditorGUILayout.BeginHorizontal();
-            EditorGUI.BeginChangeCheck();
-            EditorGUILayout.PrefixLabel(new GUIContent("Aramaic Script", "Select the script to use"));
-            aramaicScriptProp.enumValueIndex = (int)(AramaicScript)EditorGUILayout.EnumPopup((AramaicScript)aramaicScriptProp.enumValueIndex);
-            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.PropertyField(aramaicScriptProp, new GUIContent("Aramaic Script"));
+            EditorGUILayout.PropertyField(forceFixProp, new GUIContent("Force Fix"));
+            EditorGUILayout.PropertyField(forceFarsiNumbersProp, new GUIContent("Force Farsi Numbers"));
+            EditorGUILayout.PropertyField(updateTextOnEnableProp, new GUIContent("Update Text OnEnable"));
+            EditorGUILayout.PropertyField(fixTagsProp, new GUIContent("Fix Tags"));
 
-            EditorGUILayout.BeginHorizontal();
-            forceFixProp.boolValue = GUILayout.Toggle(forceFixProp.boolValue, new GUIContent("Force Fix"));
-            forceFarsiNumbersProp.boolValue = GUILayout.Toggle(forceFarsiNumbersProp.boolValue, new GUIContent("Force Farsi Numbers"));
-            updateTextOnEnableProp.boolValue = GUILayout.Toggle(updateTextOnEnableProp.boolValue, new GUIContent("Update Text OnEnable"));
-
-            if (tmpro.richText)
-                fixTagsProp.boolValue = GUILayout.Toggle(fixTagsProp.boolValue, new GUIContent("FixTags"));
-
-            EditorGUILayout.EndHorizontal();
+            if (EditorGUI.EndChangeCheck())
+                m_HavePropertiesChanged = true;
         }
 
         protected virtual void ListenForZeroWidthNoJoiner()
