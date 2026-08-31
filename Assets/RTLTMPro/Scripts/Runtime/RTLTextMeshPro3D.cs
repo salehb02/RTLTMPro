@@ -7,7 +7,7 @@ namespace RTLTMPro
     public class RTLTextMeshPro3D : TextMeshPro, ISerializationCallbackReceiver
     {
         // ReSharper disable once InconsistentNaming
-#if TMP_VERSION_2_1_0_OR_NEWER
+#if TMP_VERSION_2_1_0_OR_NEWER || UNITY_6000_0_OR_NEWER
         public override string text
 #else
         public new string text
@@ -30,15 +30,15 @@ namespace RTLTMPro
             get { return originalText; }
         }
 
-        public bool PreserveNumbers
+        public bool ForceFarsiNumbers
         {
-            get { return preserveNumbers; }
+            get { return forceFarsiNumbers; }
             set
             {
-                if (preserveNumbers == value)
+                if (forceFarsiNumbers == value)
                     return;
 
-                preserveNumbers = value;
+                forceFarsiNumbers = value;
                 havePropertiesChanged = true;
             }
         }
@@ -69,7 +69,7 @@ namespace RTLTMPro
             }
         }
 
-        protected bool ForceFix
+        public bool ForceFix
         {
             get { return forceFix; }
             set
@@ -82,13 +82,12 @@ namespace RTLTMPro
             }
         }
 
-        [SerializeField] protected bool preserveNumbers;
+        [SerializeField] protected bool forceFarsiNumbers;
 
-        [SerializeField, HideInInspector]
-        private bool farsi = true;
+        [SerializeField, HideInInspector] private bool farsi = true;
+
         // A flag to ensure we only migrate the data once per component.
-        [SerializeField, HideInInspector]
-        private bool hasMigratedToEnum = false;
+        [SerializeField, HideInInspector] private bool hasMigratedToEnum = false;
         [SerializeField] protected AramaicScript aramaicScript = AramaicScript.Persian;
 
         [SerializeField][TextArea(3, 10)] protected string originalText;
@@ -96,6 +95,8 @@ namespace RTLTMPro
         [SerializeField] protected bool fixTags = true;
 
         [SerializeField] protected bool forceFix;
+
+        [SerializeField] protected bool updateTextOnEnable;
 
         protected readonly FastStringBuilder finalText = new FastStringBuilder(RTLSupport.DefaultBufferSize);
 
@@ -105,6 +106,14 @@ namespace RTLTMPro
             {
                 UpdateText();
             }
+        }
+
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+
+            if (updateTextOnEnable)
+                UpdateText();
         }
 
         public void UpdateText()
@@ -132,10 +141,9 @@ namespace RTLTMPro
                 return input;
 
             finalText.Clear();
-            RTLSupport.FixRTL(input, finalText, aramaicScript, fixTags, preserveNumbers, CheckSupportChar);
+            RTLSupport.FixRTL(RTLNumberFixer.ConvertToEnglishDigits(input), finalText, aramaicScript, fixTags, true, CheckSupportChar);
             finalText.Reverse();
-
-            return finalText.ToString();
+            return RTLNumberFixer.FixNumbers(finalText.ToString(), farsi, forceFarsiNumbers);
         }
 
         private bool CheckSupportChar(char character)

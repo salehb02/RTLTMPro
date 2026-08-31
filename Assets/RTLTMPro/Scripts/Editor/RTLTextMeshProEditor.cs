@@ -14,10 +14,12 @@ namespace RTLTMPro
     public class RTLTextMeshProEditor : TMP_UiEditorPanel
     {
         private SerializedProperty originalTextProp;
-        private SerializedProperty preserveNumbersProp;
+        private SerializedProperty forceFarsiNumbersProp;
         private SerializedProperty aramaicScriptProp;
         private SerializedProperty fixTagsProp;
         private SerializedProperty forceFixProp;
+        private SerializedProperty updateTextOnEnableProp;
+
 
         private bool foldout;
         private RTLTextMeshPro tmpro;
@@ -26,11 +28,12 @@ namespace RTLTMPro
         {
             base.OnEnable();
             foldout = true;
-            preserveNumbersProp = serializedObject.FindProperty("preserveNumbers");
+            forceFarsiNumbersProp = serializedObject.FindProperty("forceFarsiNumbers");
             aramaicScriptProp = serializedObject.FindProperty("aramaicScript");
             fixTagsProp = serializedObject.FindProperty("fixTags");
             forceFixProp = serializedObject.FindProperty("forceFix");
             originalTextProp = serializedObject.FindProperty("originalText");
+            updateTextOnEnableProp = serializedObject.FindProperty("updateTextOnEnable");
         }
 
         public override void OnInspectorGUI()
@@ -88,7 +91,8 @@ namespace RTLTMPro
 
             EditorGUILayout.BeginHorizontal();
             forceFixProp.boolValue = GUILayout.Toggle(forceFixProp.boolValue, new GUIContent("Force Fix"));
-            preserveNumbersProp.boolValue = GUILayout.Toggle(preserveNumbersProp.boolValue, new GUIContent("Preserve Numbers"));
+            forceFarsiNumbersProp.boolValue = GUILayout.Toggle(forceFarsiNumbersProp.boolValue, new GUIContent("Force Farsi Numbers"));
+            updateTextOnEnableProp.boolValue = GUILayout.Toggle(updateTextOnEnableProp.boolValue, new GUIContent("Update Text OnEnable"));
 
             if (tmpro.richText)
                 fixTagsProp.boolValue = GUILayout.Toggle(fixTagsProp.boolValue, new GUIContent("FixTags"));

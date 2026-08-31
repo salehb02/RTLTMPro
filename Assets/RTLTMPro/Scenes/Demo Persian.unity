@@ -254,7 +254,7 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
-  preserveNumbers: 0
+  forceFarsiNumbers: 0
   farsi: 0
   hasMigratedToEnum: 1
   aramaicScript: 2
@@ -262,6 +262,7 @@ MonoBehaviour:
     \u06A9\u0646\u0627\u0631 \u0647\u0645"
   fixTags: 0
   forceFix: 0
+  updateTextOnEnable: 1
 --- !u!222 &273906221
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -672,7 +673,7 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
-  preserveNumbers: 0
+  forceFarsiNumbers: 0
   farsi: 0
   hasMigratedToEnum: 1
   aramaicScript: 2
@@ -681,6 +682,7 @@ MonoBehaviour:
     \u0645\u0631\u062F\u0645"
   fixTags: 0
   forceFix: 0
+  updateTextOnEnable: 0
 --- !u!222 &645895904
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -1024,7 +1026,7 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
-  preserveNumbers: 0
+  forceFarsiNumbers: 0
   farsi: 0
   hasMigratedToEnum: 1
   aramaicScript: 2
@@ -1034,6 +1036,7 @@ MonoBehaviour:
     \u0647\u0627"
   fixTags: 0
   forceFix: 0
+  updateTextOnEnable: 1
 --- !u!222 &1053276722
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -1335,7 +1338,7 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
-  preserveNumbers: 0
+  forceFarsiNumbers: 0
   farsi: 0
   hasMigratedToEnum: 1
   aramaicScript: 2
@@ -1371,6 +1374,7 @@ MonoBehaviour:
     \u0627\u0648 \u0646\u06CC\u0633\u062A."
   fixTags: 0
   forceFix: 0
+  updateTextOnEnable: 1
 --- !u!222 &1188808157
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -1438,10 +1442,10 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\uFECB\uFEAA\uFEA9 \uFED3\uFE8E\uFEAD\uFEB3\uFBFD \u06F3\u06F2\u06F1 \uFEED
-    \u06F3\u06F2\u06F1.\u06F2\u06F3 \uFEED \u06F3\u06F2\u06F1,\u06F6\u06F5\u06F4
-    \uFEED )\u06F3\u06F2\u06F1( \uFEED )\u06F3\u06F2\u06F1.\u06F5\u06F4( \uFEED 
-    )\u06F3\u06F2\u06F1,\u06F6\u06F5\u06F4) \uFB58\uFE8E\uFBFE\uFE8E\uFEE5."
+  m_text: "\uFECB\uFEAA\uFEA9 \uFED3\uFE8E\uFEAD\uFEB3\uFBFD  \u06F3\u06F2\u06F1
+    \uFEED \u06F2\u06F3.\u06F3\u06F2\u06F1 \uFEED \u06F6\u06F5\u06F4,\u06F3\u06F2\u06F1
+    \uFEED )\u06F3\u06F2\u06F1( \uFEED )\u06F5\u06F4.\u06F3\u06F2\u06F1( \uFEED 
+    )\u06F6\u06F5\u06F4,\u06F3\u06F2\u06F1( \uFB58\uFE8E\uFBFE\uFE8E\uFEE5."
   m_isRightToLeft: 1
   m_fontAsset: {fileID: 11400000, guid: 3fbde2e562e333d488bc46986fc6f4f1, type: 2}
   m_sharedMaterial: {fileID: -6949820610600499109, guid: 3fbde2e562e333d488bc46986fc6f4f1,
@@ -1469,7 +1473,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 65.15
+  m_fontSize: 64.55
   m_fontSizeBase: 60
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -1514,14 +1518,15 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
-  preserveNumbers: 0
+  forceFarsiNumbers: 1
   farsi: 0
   hasMigratedToEnum: 1
   aramaicScript: 2
-  originalText: "\u0639\u062F\u062F \u0641\u0627\u0631\u0633\u06CC 123 \u0648 123.32
-    \u0648 123,456 \u0648 (123) \u0648 (123.45) \u0648  (123,456( \u067E\u0627\u06CC\u0627\u0646."
+  originalText: "\u0639\u062F\u062F \u0641\u0627\u0631\u0633\u06CC  123 \u0648 \u06F1\u06F2\u06F3.\u06F3\u06F2
+    \u0648 123,456 \u0648 (123) \u0648 (123.45) \u0648  (123,456) \u067E\u0627\u06CC\u0627\u0646."
   fixTags: 0
   forceFix: 0
+  updateTextOnEnable: 1
 --- !u!222 &1332193558
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -1930,7 +1935,7 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
-  preserveNumbers: 1
+  forceFarsiNumbers: 0
   farsi: 0
   hasMigratedToEnum: 1
   aramaicScript: 2
@@ -1938,6 +1943,7 @@ MonoBehaviour:
     \u0648 123.45 \u0648 123,123 \u0648 (123) \u0648 (123.45) \u067E\u0627\u06CC\u0627\u0646."
   fixTags: 0
   forceFix: 0
+  updateTextOnEnable: 1
 --- !u!222 &2030634300
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -2123,7 +2129,7 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
-  preserveNumbers: 0
+  forceFarsiNumbers: 0
   farsi: 0
   hasMigratedToEnum: 1
   aramaicScript: 2
@@ -2131,6 +2137,7 @@ MonoBehaviour:
     {\u06AF\u06CC\u0648\u0645\u0647} \u0648 [\u0628\u0631\u0627\u06A9\u062A]"
   fixTags: 0
   forceFix: 0
+  updateTextOnEnable: 1
 --- !u!222 &2134552159
 CanvasRenderer:
   m_ObjectHideFlags: 0

@@ -30,15 +30,15 @@ namespace RTLTMPro
             get { return originalText; }
         }
 
-        public bool PreserveNumbers
+        public bool ForceFarsiNumbers
         {
-            get { return preserveNumbers; }
+            get { return forceFarsiNumbers; }
             set
             {
-                if (preserveNumbers == value)
+                if (forceFarsiNumbers == value)
                     return;
 
-                preserveNumbers = value;
+                forceFarsiNumbers = value;
                 havePropertiesChanged = true;
             }
         }
@@ -82,7 +82,7 @@ namespace RTLTMPro
             }
         }
 
-        [SerializeField] protected bool preserveNumbers;
+        [SerializeField] protected bool forceFarsiNumbers;
 
         [SerializeField, HideInInspector] private bool farsi = true;
 
@@ -96,6 +96,8 @@ namespace RTLTMPro
 
         [SerializeField] protected bool forceFix;
 
+        [SerializeField] protected bool updateTextOnEnable;
+
         protected readonly FastStringBuilder finalText = new FastStringBuilder(RTLSupport.DefaultBufferSize);
 
         protected void Update()
@@ -104,6 +106,14 @@ namespace RTLTMPro
             {
                 UpdateText();
             }
+        }
+
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+
+            if (updateTextOnEnable)
+                UpdateText();
         }
 
         public void UpdateText()
@@ -131,9 +141,9 @@ namespace RTLTMPro
                 return input;
 
             finalText.Clear();
-            RTLSupport.FixRTL(input, finalText, aramaicScript, fixTags, preserveNumbers, CheckSupportChar);
+            RTLSupport.FixRTL(RTLNumberFixer.ConvertToEnglishDigits(input), finalText, aramaicScript, fixTags, true, CheckSupportChar);
             finalText.Reverse();
-            return finalText.ToString();
+            return RTLNumberFixer.FixNumbers(finalText.ToString(), farsi, forceFarsiNumbers);
         }
 
         private bool CheckSupportChar(char character)
