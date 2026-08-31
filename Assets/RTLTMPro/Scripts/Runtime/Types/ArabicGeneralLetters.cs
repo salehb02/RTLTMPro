@@ -50,5 +50,12 @@ namespace RTLTMPro
         Gaf = 0x06AF, // persian ?
 
         Tatweel = 0x640, // ?
+
+        Ve = 0x06A4,           // Kurdish V
+        Oe = 0x06C6,           // Kurdish O
+        KurdishYeh = 0x06CE,   // Kurdish E
+        KurdishReh = 0x0695,   // Kurdish Fat R
+        KurdishLam = 0x06B5,   // Kurdish Fat L 
+        Ae = 0x06D5            // Kurdish Ae
     }
 }

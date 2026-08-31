@@ -9,7 +9,7 @@ namespace RTLTMPro
     {
         private SerializedProperty originalTextProp;
         private SerializedProperty preserveNumbersProp;
-        private SerializedProperty farsiProp;
+        private SerializedProperty aramaicScriptProp;
         private SerializedProperty fixTagsProp;
         private SerializedProperty forceFixProp;
 
@@ -21,7 +21,7 @@ namespace RTLTMPro
             base.OnEnable();
             foldout = true;
             preserveNumbersProp = serializedObject.FindProperty("preserveNumbers");
-            farsiProp = serializedObject.FindProperty("farsi");
+            aramaicScriptProp = serializedObject.FindProperty("aramaicScript");
             fixTagsProp = serializedObject.FindProperty("fixTags");
             forceFixProp = serializedObject.FindProperty("forceFix");
             originalTextProp = serializedObject.FindProperty("originalText");
@@ -30,8 +30,8 @@ namespace RTLTMPro
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
-            tmpro = (RTLTextMeshPro3D) target;
-            
+            tmpro = (RTLTextMeshPro3D)target;
+
             EditorGUILayout.Space();
             EditorGUI.BeginChangeCheck();
             EditorGUILayout.PropertyField(originalTextProp, new GUIContent("RTL Text Input Box"));
@@ -76,7 +76,11 @@ namespace RTLTMPro
         {
             EditorGUILayout.BeginHorizontal();
             EditorGUI.BeginChangeCheck();
-            farsiProp.boolValue = GUILayout.Toggle(farsiProp.boolValue, new GUIContent("Farsi"));
+            EditorGUILayout.PrefixLabel(new GUIContent("Aramaic Script", "Select the script to use"));
+            aramaicScriptProp.enumValueIndex = (int)(AramaicScript)EditorGUILayout.EnumPopup((AramaicScript)aramaicScriptProp.enumValueIndex);
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
             forceFixProp.boolValue = GUILayout.Toggle(forceFixProp.boolValue, new GUIContent("Force Fix"));
             preserveNumbersProp.boolValue = GUILayout.Toggle(preserveNumbersProp.boolValue, new GUIContent("Preserve Numbers"));
 
@@ -88,7 +92,7 @@ namespace RTLTMPro
 
         protected virtual void ListenForZeroWidthNoJoiner()
         {
-            var editor = (TextEditor) GUIUtility.GetStateObject(typeof(TextEditor), GUIUtility.keyboardControl);
+            var editor = (TextEditor)GUIUtility.GetStateObject(typeof(TextEditor), GUIUtility.keyboardControl);
 
             bool shortcutPressed = (Event.current.modifiers & EventModifiers.Control) != 0 &&
                                    (Event.current.modifiers & EventModifiers.Shift) != 0 &&
@@ -97,7 +101,7 @@ namespace RTLTMPro
 
             if (!shortcutPressed) return;
 
-            originalTextProp.stringValue = originalTextProp.stringValue.Insert(editor.cursorIndex, ((char) SpecialCharacters.ZeroWidthNoJoiner).ToString());
+            originalTextProp.stringValue = originalTextProp.stringValue.Insert(editor.cursorIndex, ((char)SpecialCharacters.ZeroWidthNoJoiner).ToString());
             editor.selectIndex++;
             editor.cursorIndex++;
             Event.current.Use();

@@ -15,7 +15,7 @@ namespace RTLTMPro
     {
         private SerializedProperty originalTextProp;
         private SerializedProperty preserveNumbersProp;
-        private SerializedProperty farsiProp;
+        private SerializedProperty aramaicScriptProp;
         private SerializedProperty fixTagsProp;
         private SerializedProperty forceFixProp;
 
@@ -27,7 +27,7 @@ namespace RTLTMPro
             base.OnEnable();
             foldout = true;
             preserveNumbersProp = serializedObject.FindProperty("preserveNumbers");
-            farsiProp = serializedObject.FindProperty("farsi");
+            aramaicScriptProp = serializedObject.FindProperty("aramaicScript");
             fixTagsProp = serializedObject.FindProperty("fixTags");
             forceFixProp = serializedObject.FindProperty("forceFix");
             originalTextProp = serializedObject.FindProperty("originalText");
@@ -82,7 +82,11 @@ namespace RTLTMPro
         {
             EditorGUILayout.BeginHorizontal();
             EditorGUI.BeginChangeCheck();
-            farsiProp.boolValue = GUILayout.Toggle(farsiProp.boolValue, new GUIContent("Farsi"));
+            EditorGUILayout.PrefixLabel(new GUIContent("Aramaic Script", "Select the script to use"));
+            aramaicScriptProp.enumValueIndex = (int)(AramaicScript)EditorGUILayout.EnumPopup((AramaicScript)aramaicScriptProp.enumValueIndex);
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
             forceFixProp.boolValue = GUILayout.Toggle(forceFixProp.boolValue, new GUIContent("Force Fix"));
             preserveNumbersProp.boolValue = GUILayout.Toggle(preserveNumbersProp.boolValue, new GUIContent("Preserve Numbers"));
 

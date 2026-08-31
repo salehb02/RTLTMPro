@@ -21,27 +21,28 @@ namespace RTLTMPro
         /// </summary>
         /// <param name="input">Text to fix</param>
         /// <param name="output">Fixed text</param>
+        ///         /// <param name="aramaicScript"></param>
         /// <param name="fixTextTags"></param>
         /// <param name="preserveNumbers"></param>
-        /// <param name="farsi"></param>
-        /// <returns>Fixed text</returns>
-        public static void FixRTL(
-            string input,
+        /// <param name="checkSupportChar"></param>
+        /// /// <returns>Fixed text</returns>
+        public static void FixRTL(string input,
             FastStringBuilder output,
-            bool farsi = true,
+            AramaicScript aramaicScript = AramaicScript.Persian,
             bool fixTextTags = true,
-            bool preserveNumbers = false)
+            bool preserveNumbers = false,
+           System.Func<char, bool> checkSupportChar = null)
         {
             inputBuilder.SetValue(input);
             TashkeelFixer.RemoveTashkeel(inputBuilder);
             // The shape of the letters in shapeFixedLetters is fixed according to their position in word. But the flow of the text is not fixed.
-            GlyphFixer.Fix(inputBuilder, glyphFixerOutput, preserveNumbers, farsi, fixTextTags);
+            GlyphFixer.Fix(inputBuilder, glyphFixerOutput, preserveNumbers, aramaicScript, fixTextTags, checkSupportChar);
             //Restore tashkeel to their places.
             TashkeelFixer.RestoreTashkeel(glyphFixerOutput);
-            
+
             TashkeelFixer.FixShaddaCombinations(glyphFixerOutput);
             // Fix flow of the text and put the result in FinalLetters field
-            LigatureFixer.Fix(glyphFixerOutput, output, farsi, fixTextTags, preserveNumbers);
+            LigatureFixer.Fix(glyphFixerOutput, output, aramaicScript, fixTextTags, preserveNumbers);
             if (fixTextTags)
             {
                 RichTextFixer.Fix(output);

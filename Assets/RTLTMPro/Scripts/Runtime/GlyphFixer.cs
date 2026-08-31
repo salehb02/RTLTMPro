@@ -40,11 +40,13 @@ namespace RTLTMPro
         /// <param name="input"></param>
         /// <param name="output"></param>
         /// <param name="preserveNumbers"></param>
-        /// <param name="farsi"></param>
+        /// <param name="aramaicScript"></param>
+        /// <param name="fixTextTags"></param>
+        /// <param name="checkSupportChar"></param>
         /// <returns></returns>
-        public static void Fix(FastStringBuilder input, FastStringBuilder output, bool preserveNumbers, bool farsi, bool fixTextTags)
+        public static void Fix(FastStringBuilder input, FastStringBuilder output, bool preserveNumbers, AramaicScript aramaicScript, bool fixTextTags, Func<char, bool> checkSupportChar = null)
         {
-            FixYah(input, farsi);
+            FixYah(input, aramaicScript);
 
             output.SetValue(input);
 
@@ -53,68 +55,142 @@ namespace RTLTMPro
                 int iChar = input.Get(i);
 
                 // For special Lam Letter connections.
-                if (iChar == (int)ArabicGeneralLetters.Lam && i < input.Length - 1 && HandleSpecialLam(input, output, i))
+                if (iChar == (int)ArabicGeneralLetters.Lam && i < input.Length - 1 && HandleSpecialLam(input, output, i) ||
+                                    iChar == (int)ArabicGeneralLetters.KurdishLam && i < input.Length - 1 && HandleSpecialKurdishLam(input, output, i))
                 {
-                    if (i > 0) {
-                        char converted = (char)output.Get(i);
-                        int previousIndexLetter = input.Get(i - 1);
-
-                        if (CanCharacterBeConnectedToNext(previousIndexLetter))
-                        {
-                            output.Set(i, (char)(converted + 1));
-                        }
-                    }
-                    // Skip over the 0xFFFF character HandleSpecialLam injects.
-                    i++;
-                }  else if (TextUtils.IsGlyphFixedArabicCharacter((char)iChar))
+                    FixLamForm(input, output, ref i);   // For special Lam Letter connections.
+                }
+                else if (TextUtils.IsGlyphFixedArabicCharacter((char)iChar))
                 {
-                    char converted = GlyphTable.Convert((char)iChar);
+                    char converted = (char)iChar;
 
-                    if (IsMiddleLetter(input, i))
+                    if (aramaicScript != AramaicScript.Kurdish || converted != (char)ConstantChars.KurdishHa)
+                        converted = GlyphTable.Convert(converted);
+
+                    bool isMiddle = IsMiddleLetter(input, i);
+                    bool isFinishing = IsFinishingLetter(input, i);
+                    bool isLeading = IsLeadingLetter(input, i);
+                    char result;
+
+                    if (aramaicScript == AramaicScript.Kurdish && TryGetKurdishException(converted, isMiddle, isFinishing, isLeading, out char kurdishChar))
                     {
-                        output.Set(i, (char)(converted + 3));
-                    }
-                    else if (IsFinishingLetter(input, i))
-                    {
-                        output.Set(i, (char)(converted + 1));
-                    }
-                    else if (IsLeadingLetter(input, i))
-                    {
-                        output.Set(i, (char)(converted + 2));
+                        result = kurdishChar;
                     }
                     else
                     {
-                        output.Set(i, (char)converted);
+                        if (isMiddle) result = (char)(converted + 3);
+                        else if (isFinishing) result = (char)(converted + 1);
+                        else if (isLeading) result = (char)(converted + 2);
+                        else result = converted;
                     }
+
+                    bool isolated = !isMiddle && !isFinishing && !isLeading;
+                    if (aramaicScript is AramaicScript.Kurdish && isolated && iChar != converted)
+                        CheckKurdishIsolateState(converted, iChar, checkSupportChar, out result);
+                    output.Set(i, result);
                 }
             }
 
             if (!preserveNumbers)
             {
-                if (fixTextTags)
+                if (fixTextTags) FixNumbersOutsideOfTags(output, aramaicScript);
+                else FixNumbers(output, aramaicScript);
+            }
+        }
+
+        /// <summary>
+        /// Handles specific shaping exceptions for Kurdish characters that break the standard offset rule.
+        /// </summary>
+        private static bool TryGetKurdishException(char converted, bool isMiddle, bool isFinishing, bool isLeading, out char result)
+        {
+            bool isKurdishHa = converted is (char)0x0647 or (char)0x06BE;
+            bool isKurdishAe = converted == (char)0x06D5;
+
+            if (isKurdishHa)
+            {
+                if (isMiddle)
                 {
-                    FixNumbersOutsideOfTags(output, farsi);
-                } else
+                    result = (char)ConstantChars.KurdishHaMiddle;
+                }
+                else if (isFinishing)
                 {
-                    FixNumbers(output, farsi);
+                    result = (char)ConstantChars.KurdishAeFinish;
+                }
+                else if (isLeading)
+                {
+                    result = (char)ConstantChars.KurdishHaLeading;
+                }
+                else
+                {
+                    result = converted;
+                    return false;
+                }
+
+                return true;
+            }
+
+            if (isKurdishAe)
+            {
+                if (isMiddle || isFinishing)
+                {
+                    result = (char)ConstantChars.KurdishAeFinish;
+                }
+                else if (isLeading)
+                {
+                    result = (char)ConstantChars.KurdishAe;
+                }
+                else
+                {
+                    result = converted;
+                    return false;
+                }
+
+                return true;
+            }
+
+            result = converted;
+            return false;
+        }
+
+        private static void CheckKurdishIsolateState(char converted, int iChar, Func<char, bool> checkSupportChar, out char result)
+        {
+            var isSpecialKurdishLetter = TextUtils.IsSpecialKurdishLetter(converted) || checkSupportChar == null || !checkSupportChar(converted);
+            result = isSpecialKurdishLetter ? (char)iChar : converted;
+        }
+
+        private static void FixLamForm(FastStringBuilder input, FastStringBuilder output, ref int i)
+        {
+            if (i > 0)
+            {
+                char converted = (char)output.Get(i);
+                int previousIndexLetter = input.Get(i - 1);
+
+                if (CanCharacterBeConnectedToNext(previousIndexLetter))
+                {
+                    var result = (char)(input.Get(i) == 0x644 ? converted + 1 : converted - 1);
+                    output.Set(i, result);
                 }
             }
+
+            // Skip over the 0xFFFF character HandleSpecialLam injects. 
+            i++;
         }
 
         /// <summary>
         ///     Removes tashkeel. Converts general RTL letters to isolated form. Also fixes Farsi and Arabic ی letter.
         /// </summary>
         /// <param name="text">Input to prepare</param>
-        /// <param name="farsi"></param>
-        /// <returns>Prepared input in char array</returns>
-        public static void FixYah(FastStringBuilder text, bool farsi)
+        /// <param name="aramaicScript"></param>
+        /// /// <returns>Prepared input in char array</returns>
+        public static void FixYah(FastStringBuilder text, AramaicScript aramaicScript)
         {
             for (int i = 0; i < text.Length; i++)
             {
-                if (farsi && text.Get(i) == (int)ArabicGeneralLetters.Yeh)
+                if (aramaicScript is AramaicScript.Kurdish or AramaicScript.Persian && text.Get(i) == (int)ArabicGeneralLetters.Yeh)
                 {
                     text.Set(i, (char)ArabicGeneralLetters.FarsiYeh);
-                } else if (farsi == false && text.Get(i) == (int)ArabicGeneralLetters.FarsiYeh)
+                }
+                else if (aramaicScript is AramaicScript.Arabic && text.Get(i) == (int)ArabicGeneralLetters.FarsiYeh)
                 {
                     text.Set(i, (char)ArabicGeneralLetters.Yeh);
                 }
@@ -166,14 +242,37 @@ namespace RTLTMPro
             return isFixed;
         }
 
+        private static bool HandleSpecialKurdishLam(FastStringBuilder input, FastStringBuilder output, int i)
+        {
+            bool isFixed;
+            switch (input.Get(i + 1))
+            {
+                case (char)ArabicGeneralLetters.Alef:
+                    output.Set(i, (char)0xE003);
+                    isFixed = true;
+                    break;
+                default:
+                    isFixed = false;
+                    break;
+            }
+
+            if (isFixed)
+            {
+                output.Set(i + 1, (char)0xFFFF);
+            }
+
+            return isFixed;
+        }
+
         /// <summary>
         ///     Converts English numbers to Persian or Arabic numbers.
         /// </summary>
         /// <param name="text"></param>
-        /// <param name="farsi"></param>
-        /// <returns>Converted number</returns>
-        public static void FixNumbers(FastStringBuilder text, bool farsi)
+        /// <param name="aramaicScript"></param>
+        /// /// <returns>Converted number</returns>
+        public static void FixNumbers(FastStringBuilder text, AramaicScript aramaicScript)
         {
+            var farsi = aramaicScript is AramaicScript.Persian;
             text.Replace((char)EnglishNumbers.Zero, farsi ? (char)FarsiNumbers.Zero : (char)HinduNumbers.Zero);
             text.Replace((char)EnglishNumbers.One, farsi ? (char)FarsiNumbers.One : (char)HinduNumbers.One);
             text.Replace((char)EnglishNumbers.Two, farsi ? (char)FarsiNumbers.Two : (char)HinduNumbers.Two);
@@ -190,9 +289,9 @@ namespace RTLTMPro
         ///     Converts English numbers that are outside tags to Persian or Arabic numbers.
         /// </summary>
         /// <param name="text"></param>
-        /// <param name="farsi"></param>
-        /// <returns>Text with converted numbers</returns>
-        public static void FixNumbersOutsideOfTags(FastStringBuilder text, bool farsi)
+        /// <param name="aramaicScript"></param>
+        /// /// <returns>Text with converted numbers</returns>
+        public static void FixNumbersOutsideOfTags(FastStringBuilder text, AramaicScript aramaicScript)
         {
             var englishDigits = new HashSet<char>(EnglishToFarsiNumberMap.Keys);
             for (int i = 0; i < text.Length; i++)
@@ -208,7 +307,8 @@ namespace RTLTMPro
                         if ((j == i + 1 && jChar == ' ') || jChar == '<')
                         {
                             break;
-                        } else if (jChar == '>')
+                        }
+                        else if (jChar == '>')
                         {
                             i = j;
                             sawValidTag = true;
@@ -221,7 +321,7 @@ namespace RTLTMPro
 
                 if (englishDigits.Contains((char)iChar))
                 {
-                    text.Set(i, farsi ? EnglishToFarsiNumberMap[(char)iChar] : EnglishToHinduNumberMap[(char)iChar]);
+                    text.Set(i, aramaicScript is AramaicScript.Persian ? EnglishToFarsiNumberMap[(char)iChar] : EnglishToHinduNumberMap[(char)iChar]);
                 }
             }
         }
@@ -240,7 +340,7 @@ namespace RTLTMPro
             int nextIndexLetter = letters.Get(index + 1);
 
             return (index == 0 ||
-                   !CanCharacterBeConnectedToNext(previousIndexLetter) || 
+                   !CanCharacterBeConnectedToNext(previousIndexLetter) ||
                    !CanCharacterBeConnectedToPrevious(currentIndexLetter)) &&
                    CanCharacterBeConnectedToNext(currentIndexLetter) &&
                    CanCharacterBeConnectedToPrevious(nextIndexLetter);
@@ -281,8 +381,8 @@ namespace RTLTMPro
             int previousIndexLetter = letters.Get(index - 1);
             int nextIndexLetter = letters.Get(index + 1);
 
-            return 
-                CanCharacterBeConnectedToNext(previousIndexLetter) && 
+            return
+                CanCharacterBeConnectedToNext(previousIndexLetter) &&
                 CanCharacterBeConnectedToPrevious(currentIndexLetter) &&
                 CanCharacterBeConnectedToNext(currentIndexLetter) &&
                 CanCharacterBeConnectedToPrevious(nextIndexLetter);
@@ -290,7 +390,7 @@ namespace RTLTMPro
 
         private static bool CanCharacterBeConnectedToNext(int character)
         {
-            return 
+            return
                 character != (int)ArabicGeneralLetters.Hamza &&
                 character != (int)ArabicGeneralLetters.AlefMaddaAbove &&
                 character != (int)ArabicGeneralLetters.AlefHamzaAbove &&
@@ -303,6 +403,9 @@ namespace RTLTMPro
                 character != (int)ArabicGeneralLetters.Zain &&
                 character != (int)ArabicGeneralLetters.Jeh &&
                 character != (int)ArabicGeneralLetters.Waw &&
+                character != (int)ArabicGeneralLetters.KurdishReh &&
+                character != (int)ArabicGeneralLetters.Oe &&
+                character != (int)ArabicGeneralLetters.Ae &&
                 TextUtils.IsGlyphFixedArabicCharacter((char)character);
         }
 

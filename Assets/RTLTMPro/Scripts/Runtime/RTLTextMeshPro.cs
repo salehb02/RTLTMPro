@@ -4,7 +4,7 @@ using UnityEngine;
 namespace RTLTMPro
 {
     [ExecuteInEditMode]
-    public class RTLTextMeshPro : TextMeshProUGUI
+    public class RTLTextMeshPro : TextMeshProUGUI, ISerializationCallbackReceiver
     {
         // ReSharper disable once InconsistentNaming
 #if TMP_VERSION_2_1_0_OR_NEWER || UNITY_6000_0_OR_NEWER
@@ -43,15 +43,15 @@ namespace RTLTMPro
             }
         }
 
-        public bool Farsi
+        public AramaicScript AramaicScript
         {
-            get { return farsi; }
+            get { return aramaicScript; }
             set
             {
-                if (farsi == value)
+                if (aramaicScript == value)
                     return;
 
-                farsi = value;
+                aramaicScript = value;
                 havePropertiesChanged = true;
             }
         }
@@ -84,9 +84,13 @@ namespace RTLTMPro
 
         [SerializeField] protected bool preserveNumbers;
 
-        [SerializeField] protected bool farsi = true;
+        [SerializeField, HideInInspector] private bool farsi = true;
 
-        [SerializeField] [TextArea(3, 10)] protected string originalText;
+        // A flag to ensure we only migrate the data once per component.
+        [SerializeField, HideInInspector] private bool hasMigratedToEnum = false;
+        [SerializeField] protected AramaicScript aramaicScript = AramaicScript.Persian;
+
+        [SerializeField][TextArea(3, 10)] protected string originalText;
 
         [SerializeField] protected bool fixTags = true;
 
@@ -111,7 +115,8 @@ namespace RTLTMPro
             {
                 isRightToLeftText = false;
                 base.text = originalText;
-            } else
+            }
+            else
             {
                 isRightToLeftText = true;
                 base.text = GetFixedText(originalText);
@@ -126,9 +131,25 @@ namespace RTLTMPro
                 return input;
 
             finalText.Clear();
-            RTLSupport.FixRTL(input, finalText, farsi, fixTags, preserveNumbers);
+            RTLSupport.FixRTL(input, finalText, aramaicScript, fixTags, preserveNumbers, CheckSupportChar);
             finalText.Reverse();
             return finalText.ToString();
+        }
+
+        private bool CheckSupportChar(char character)
+        {
+            return m_fontAsset.HasCharacter(character);
+        }
+
+        public void OnBeforeSerialize()
+        {
+        }
+
+        public void OnAfterDeserialize()
+        {
+            if (hasMigratedToEnum) return;
+            aramaicScript = farsi ? AramaicScript.Persian : AramaicScript.Arabic;
+            hasMigratedToEnum = true;
         }
     }
 }

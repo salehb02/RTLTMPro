@@ -1,5 +1,5 @@
-﻿using System;
-using NUnit.Framework;
+﻿using NUnit.Framework;
+using System;
 
 namespace RTLTMPro.Tests
 {
@@ -10,7 +10,7 @@ namespace RTLTMPro.Tests
             var text = new FastStringBuilder(10);
             var englishNumbers = Enum.GetValues(typeof(EnglishNumbers));
             foreach (int englishNumber in englishNumbers)
-                text.Append((char) englishNumber);
+                text.Append((char)englishNumber);
             return text;
         }
 
@@ -19,7 +19,7 @@ namespace RTLTMPro.Tests
             var text = new FastStringBuilder(10);
             var farsiNumbers = Enum.GetValues(typeof(FarsiNumbers));
             foreach (int farsiNumber in farsiNumbers)
-                text.Append((char) farsiNumber);
+                text.Append((char)farsiNumber);
             return text;
         }
 
@@ -28,7 +28,7 @@ namespace RTLTMPro.Tests
             var text = new FastStringBuilder(10);
             var hinduNumbers = Enum.GetValues(typeof(HinduNumbers));
             foreach (int hinduNumber in hinduNumbers)
-                text.Append((char) hinduNumber);
+                text.Append((char)hinduNumber);
             return text;
         }
 
@@ -38,8 +38,7 @@ namespace RTLTMPro.Tests
             var text = GetEnglishNumbers();
             var expected = GetFarsiNumbers();
 
-            GlyphFixer.FixNumbers(text, true);
-
+            GlyphFixer.FixNumbers(text, AramaicScript.Persian);
             Assert.AreEqual(expected.ToString(), text.ToString());
         }
 
@@ -49,8 +48,7 @@ namespace RTLTMPro.Tests
             var text = GetEnglishNumbers();
             var expected = GetHinduNumbers();
 
-            GlyphFixer.FixNumbers(text, false);
-
+            GlyphFixer.FixNumbers(text, AramaicScript.Arabic);
             Assert.AreEqual(expected.ToString(), text.ToString());
         }
 
@@ -60,8 +58,7 @@ namespace RTLTMPro.Tests
             var text = GetEnglishNumbers();
             var output = new FastStringBuilder(10);
 
-            GlyphFixer.Fix(text, output, false, true, false);
-
+            GlyphFixer.Fix(text, output, false, AramaicScript.Persian, false);
             Assert.AreEqual(GetFarsiNumbers().ToString(), output.ToString());
         }
 
@@ -71,8 +68,7 @@ namespace RTLTMPro.Tests
             var text = GetEnglishNumbers();
             var output = new FastStringBuilder(10);
 
-            GlyphFixer.Fix(text, output, false, false, false);
-
+            GlyphFixer.Fix(text, output, false, AramaicScript.Arabic, false);
             Assert.AreEqual(GetHinduNumbers().ToString(), output.ToString());
         }
 
@@ -82,8 +78,7 @@ namespace RTLTMPro.Tests
             var text = GetEnglishNumbers();
             var output = new FastStringBuilder(10);
 
-            GlyphFixer.Fix(text, output, true, false, false);
-
+            GlyphFixer.Fix(text, output, true, AramaicScript.Arabic, false);
             Assert.AreEqual(text.ToString(), output.ToString());
         }
 
@@ -91,11 +86,10 @@ namespace RTLTMPro.Tests
         public void GlyphFixer_FixesYah_WhenFarsiIsRequired()
         {
             var text = new FastStringBuilder(10);
-            text.Append((char) ArabicGeneralLetters.Yeh);
+            text.Append((char)ArabicGeneralLetters.Yeh);
 
-            GlyphFixer.FixYah(text, true);
-
-            Assert.AreEqual(((char) ArabicGeneralLetters.FarsiYeh).ToString(), text.ToString());
+            GlyphFixer.FixYah(text, AramaicScript.Persian);
+            Assert.AreEqual(((char)ArabicGeneralLetters.FarsiYeh).ToString(), text.ToString());
         }
     }
 }
