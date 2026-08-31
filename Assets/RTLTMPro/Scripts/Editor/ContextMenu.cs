@@ -1,9 +1,9 @@
 ﻿using TMPro;
 using UnityEditor;
-using UnityEngine;
-using UnityEngine.UI;
-using UnityEngine.EventSystems;
 using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace RTLTMPro
 {
@@ -21,11 +21,35 @@ namespace RTLTMPro
 
         private static RTLDefaultControls.Resources s_StandardResources;
 
+#if UNITY_6000_0_OR_NEWER
+        private const string NewTextContextMenu = "GameObject/UI (Canvas)/Text - RTLTMP";
+#else
+        private const string NewTextContextMenu = "GameObject/UI/Text - RTLTMP";
+#endif
+
+#if UNITY_6000_0_OR_NEWER
+        private const string NewInputFieldContextMenu = "GameObject/UI (Canvas)/Input Field - RTLTMP";
+#else
+        private const string NewInputFieldContextMenu = "GameObject/UI/Input Field - RTLTMP";
+#endif
+
+#if UNITY_6000_0_OR_NEWER
+        private const string NewDropdownContextMenu = "GameObject/UI (Canvas)/Dropdown - RTLTMP";
+#else
+        private const string NewDropdownContextMenu = "GameObject/UI/Dropdown - RTLTMP";
+#endif
+
+#if UNITY_6000_0_OR_NEWER
+        private const string NewButtonContextMenu = "GameObject/UI (Canvas)/Button - RTLTMP";
+#else
+        private const string NewButtonContextMenu = "GameObject/UI/Button - RTLTMP";
+#endif
+
         /// <summary>
         ///     Create a TextMeshPro object that works with the CanvasRenderer
         /// </summary>
         /// <param name="command"></param>
-        [MenuItem("GameObject/UI/Text - RTLTMP", false, 2001)]
+        [MenuItem(NewTextContextMenu, false, 2001)]
         private static void CreateTextMeshProGuiObjectPerform(MenuCommand command)
         {
             // Check if there is a Canvas in the scene
@@ -137,21 +161,21 @@ namespace RTLTMPro
             Selection.activeGameObject = go;
         }
 
-        [MenuItem("GameObject/UI/Input Field - RTLTMP", false, 2037)]
+        [MenuItem(NewInputFieldContextMenu, false, 2037)]
         private static void AddTextMeshProInputField(MenuCommand menuCommand)
         {
             var go = RTLDefaultControls.CreateInputField(GetStandardResources());
             PlaceUIElementRoot(go, menuCommand);
         }
 
-        [MenuItem("GameObject/UI/Dropdown - RTLTMP", false, 2036)]
+        [MenuItem(NewDropdownContextMenu, false, 2036)]
         public static void AddDropdown(MenuCommand menuCommand)
         {
             GameObject go = RTLDefaultControls.CreateDropdown(GetStandardResources());
             PlaceUIElementRoot(go, menuCommand);
         }
 
-        [MenuItem("GameObject/UI/Button - RTLTMP", false, 2005)]
+        [MenuItem(NewButtonContextMenu, false, 2005)]
         public static void CreateButton(MenuCommand command)
         {
             var canvas = GetParentForNewObject().transform;
@@ -321,7 +345,7 @@ namespace RTLTMPro
             canvas = FindAnyObjectByType<Canvas>();
             if (canvas != null && canvas.gameObject.activeInHierarchy)
                 return canvas.gameObject;
-            
+
             // No canvas in the scene at all? Then create a new one.
             return CreateNewUI();
         }
@@ -329,7 +353,7 @@ namespace RTLTMPro
         public static GameObject GetParentForNewObject()
         {
             var activeGo = Selection.activeGameObject;
-            
+
             //Combine the result of the Null check and if the component Canvas exists or not in the parent.
             var hasCanvasInParent = activeGo != null && activeGo.GetComponentInParent<Canvas>() != null;
             if (hasCanvasInParent)
