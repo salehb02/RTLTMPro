@@ -34,6 +34,7 @@ Properties {
 	_ScaleX				("Scale X", float) = 1
 	_ScaleY				("Scale Y", float) = 1
 	_PerspectiveFilter	("Perspective Correction", Range(0, 1)) = 0.875
+	_Sharpness			("Sharpness", Range(-1,1)) = 0
 
 	_VertexOffsetX		("Vertex OffsetX", float) = 0
 	_VertexOffsetY		("Vertex OffsetY", float) = 0
@@ -48,6 +49,7 @@ Properties {
 	_StencilWriteMask	("Stencil Write Mask", Float) = 255
 	_StencilReadMask	("Stencil Read Mask", Float) = 255
 	
+	_CullMode			("Cull Mode", Float) = 0
 	_ColorMask			("Color Mask", Float) = 15
 }
 
@@ -97,7 +99,7 @@ SubShader {
 			float4	vertex			: POSITION;
 			float3	normal			: NORMAL;
 			fixed4	color			: COLOR;
-			float2	texcoord0		: TEXCOORD0;
+			float4	texcoord0		: TEXCOORD0;
 			float2	texcoord1		: TEXCOORD1;
 		};
 
@@ -114,10 +116,14 @@ SubShader {
 		#endif
 		};
 
+		float _Sharpness;
+		float _UIMaskSoftnessX;
+		float _UIMaskSoftnessY;
+		int _UIVertexColorAlwaysGammaSpace;
 
 		pixel_t VertShader(vertex_t input)
 		{
-			float bold = step(input.texcoord1.y, 0);
+			float bold = step(input.texcoord0.w, 0);
 
 			float4 vert = input.vertex;
 			vert.x += _VertexOffsetX;
@@ -128,7 +134,7 @@ SubShader {
 			pixelSize /= float2(_ScaleX, _ScaleY) * abs(mul((float2x2)UNITY_MATRIX_P, _ScreenParams.xy));
 			
 			float scale = rsqrt(dot(pixelSize, pixelSize));
-			scale *= abs(input.texcoord1.y) * _GradientScale * 1.5;
+			scale *= abs(input.texcoord0.w) * _GradientScale * (_Sharpness + 1);
 			if(UNITY_MATRIX_P[3][3] == 0) scale = lerp(abs(scale) * (1 - _PerspectiveFilter), scale, abs(dot(UnityObjectToWorldNormal(input.normal.xyz), normalize(WorldSpaceViewDir(vert)))));
 
 			float weight = lerp(_WeightNormal, _WeightBold, bold) / 4.0;
@@ -140,6 +146,7 @@ SubShader {
 			float bias = (0.5 - weight) * scale - 0.5;
 			float outline = _OutlineWidth * _ScaleRatioA * 0.5 * scale;
 
+			if (_UIVertexColorAlwaysGammaSpace && !IsGammaSpace()) input.color.rgb = UIGammaToLinear(input.color.rgb);
 			float opacity = input.color.a;
 		#if (UNDERLAY_ON | UNDERLAY_INNER)
 				opacity = 1.0;
@@ -174,7 +181,7 @@ SubShader {
 				outlineColor,
 				float4(input.texcoord0.x, input.texcoord0.y, maskUV.x, maskUV.y),
 				half4(scale, bias - outline, bias + outline, bias),
-				half4(vert.xy * 2 - clampedRect.xy - clampedRect.zw, 0.25 / (0.25 * half2(_MaskSoftnessX, _MaskSoftnessY) + pixelSize.xy)),
+			half4(vert.xy * 2 - clampedRect.xy - clampedRect.zw, 0.25 / (0.25 * half2(max(_UIMaskSoftnessX, _MaskSoftnessX), max(_UIMaskSoftnessY, _MaskSoftnessY)) + pixelSize.xy)),
 			#if (UNDERLAY_ON | UNDERLAY_INNER)
 				float4(input.texcoord0 + layerOffset, input.color.a, 0),
 				half2(layerScale, layerBias),
@@ -279,7 +286,7 @@ SubShader {
 			float4	vertex			: POSITION;
 			float3	normal			: NORMAL;
 			fixed4	color			: COLOR;
-			float2	texcoord0		: TEXCOORD0;
+			float4	texcoord0		: TEXCOORD0;
 			float2	texcoord1		: TEXCOORD1;
 		};
 
@@ -295,11 +302,15 @@ SubShader {
 		// 	half2	underlayParam	: TEXCOORD4;			// Scale(x), Bias(y)
 		// #endif
 		};
+		float _Sharpness;
+		float _UIMaskSoftnessX;
+		float _UIMaskSoftnessY;
+		int _UIVertexColorAlwaysGammaSpace;
 
 
 		pixel_t VertShader(vertex_t input)
 		{
-			float bold = step(input.texcoord1.y, 0);
+			float bold = step(input.texcoord0.w, 0);
 
 			float4 vert = input.vertex;
 			vert.x += _VertexOffsetX;
@@ -310,7 +321,7 @@ SubShader {
 			pixelSize /= float2(_ScaleX, _ScaleY) * abs(mul((float2x2)UNITY_MATRIX_P, _ScreenParams.xy));
 			
 			float scale = rsqrt(dot(pixelSize, pixelSize));
-			scale *= abs(input.texcoord1.y) * _GradientScale * 1.5;
+			scale *= abs(input.texcoord0.w) * _GradientScale * (_Sharpness + 1);
 			if(UNITY_MATRIX_P[3][3] == 0) scale = lerp(abs(scale) * (1 - _PerspectiveFilter), scale, abs(dot(UnityObjectToWorldNormal(input.normal.xyz), normalize(WorldSpaceViewDir(vert)))));
 
 			float weight = lerp(_WeightNormal, _WeightBold, bold) / 4.0;
@@ -322,6 +333,7 @@ SubShader {
 			float bias = (0.5 - weight) * scale - 0.5;
 			//float outline = _OutlineWidth * _ScaleRatioA * 0.5 * scale;
 
+			if (_UIVertexColorAlwaysGammaSpace && !IsGammaSpace()) input.color.rgb = UIGammaToLinear(input.color.rgb);
 			float opacity = input.color.a;
 		// #if (UNDERLAY_ON | UNDERLAY_INNER)
 		// 		opacity = 1.0;
@@ -356,7 +368,7 @@ SubShader {
 //				outlineColor,
 				float4(input.texcoord0.x, input.texcoord0.y, maskUV.x, maskUV.y),
 				half4(scale, bias, bias, bias),
-				half4(vert.xy * 2 - clampedRect.xy - clampedRect.zw, 0.25 / (0.25 * half2(_MaskSoftnessX, _MaskSoftnessY) + pixelSize.xy)),
+			half4(vert.xy * 2 - clampedRect.xy - clampedRect.zw, 0.25 / (0.25 * half2(max(_UIMaskSoftnessX, _MaskSoftnessX), max(_UIMaskSoftnessY, _MaskSoftnessY)) + pixelSize.xy)),
 			// #if (UNDERLAY_ON | UNDERLAY_INNER)
 			// 	float4(input.texcoord0 + layerOffset, input.color.a, 0),
 			// 	half2(layerScale, layerBias),
