@@ -1,4 +1,8 @@
-﻿using TMPro;
+﻿#if RTL_EMOJI
+using Kyub.EmojiSearch.Utilities;
+#endif
+
+using TMPro;
 using UnityEngine;
 
 namespace RTLTMPro
@@ -121,16 +125,24 @@ namespace RTLTMPro
             if (originalText == null)
                 originalText = "";
 
-            if (ForceFix == false && TextUtils.IsRTLInput(originalText) == false)
+            string processed = originalText.Replace("\t", string.Empty);
+
+#if RTL_EMOJI
+            TMP_EmojiSearchEngine.ParseEmojiCharSequence(spriteAsset, ref processed);
+#endif
+
+            if (ForceFix == false && TextUtils.IsRTLInput(processed) == false)
             {
                 isRightToLeftText = false;
-                base.text = originalText;
+                processed = processed.Trim();
             }
             else
             {
                 isRightToLeftText = true;
-                base.text = GetFixedText(originalText);
+                processed = GetFixedText(processed);
             }
+
+            base.text = processed;
 
             havePropertiesChanged = false;
         }
