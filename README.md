@@ -6,7 +6,6 @@
 > - Added Context Menu conversion from legacy `Text` and `TextMeshProUGUI` components to `RTLTextMeshPro`.
 > - Added optional Unity Localization integration for locale-aware Persian digit conversion.
 > - Added optional Unicode emoji support through Emoji Search API and TextMeshPro sprite assets.
-> - Improved RTL processing performance and added performance tests.
 > - Improved Unity 6 compatibility for shaders, editor menus, and Prefab Mode.
 > - Fixed Persian number ordering and several RTL shaping edge cases.
 >
@@ -46,13 +45,6 @@
 > 5. Use Unicode emoji directly in the text. Supported emoji sequences are converted to TextMeshPro sprite tags automatically.
 >
 > When `com.kyub.emojisearch` is installed, `RTL_EMOJI` is defined automatically.
->
-> ## Benchmark Comparison
->
-> <!-- Add benchmark images here. Example:
-> ![Before optimization](Screenshots/Benchmark-Before.png)
-> ![After optimization](Screenshots/Benchmark-After.png)
-> -->
 
 ---
 
