@@ -7,14 +7,8 @@ namespace RTLTMPro
     {
         public const int DefaultBufferSize = 2048;
 
-        private static FastStringBuilder inputBuilder;
-        private static FastStringBuilder glyphFixerOutput;
-
-        static RTLSupport()
-        {
-            inputBuilder = new FastStringBuilder(DefaultBufferSize);
-            glyphFixerOutput = new FastStringBuilder(DefaultBufferSize);
-        }
+        [System.ThreadStatic] private static FastStringBuilder inputBuilder;
+        [System.ThreadStatic] private static FastStringBuilder glyphFixerOutput;
 
         /// <summary>
         ///     Fixes the provided string
@@ -31,9 +25,15 @@ namespace RTLTMPro
             AramaicScript aramaicScript = AramaicScript.Persian,
             bool fixTextTags = true,
             bool preserveNumbers = false,
-           System.Func<char, bool> checkSupportChar = null)
+           System.Func<char, bool> checkSupportChar = null,
+           bool convertPersianNumbersToEnglish = false)
         {
+            if (inputBuilder == null) inputBuilder = new FastStringBuilder(DefaultBufferSize);
+            if (glyphFixerOutput == null) glyphFixerOutput = new FastStringBuilder(DefaultBufferSize);
+
             inputBuilder.SetValue(input);
+            if (convertPersianNumbersToEnglish)
+                RTLNumberFixer.ConvertToEnglishDigits(inputBuilder);
             TashkeelFixer.RemoveTashkeel(inputBuilder);
             // The shape of the letters in shapeFixedLetters is fixed according to their position in word. But the flow of the text is not fixed.
             GlyphFixer.Fix(inputBuilder, glyphFixerOutput, preserveNumbers, aramaicScript, fixTextTags, checkSupportChar);

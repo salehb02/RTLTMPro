@@ -5,6 +5,7 @@ namespace RTLTMPro
 {
     public static class GlyphFixer
     {
+        // Kept for API compatibility. The hot path uses arithmetic conversion instead.
         public static Dictionary<char, char> EnglishToFarsiNumberMap = new Dictionary<char, char>()
         {
             [(char)EnglishNumbers.Zero] = (char)FarsiNumbers.Zero,
@@ -32,7 +33,6 @@ namespace RTLTMPro
             [(char)EnglishNumbers.Eight] = (char)HinduNumbers.Eight,
             [(char)EnglishNumbers.Nine] = (char)HinduNumbers.Nine,
         };
-
 
         /// <summary>
         ///     Fixes the shape of letters based on their position.
@@ -272,17 +272,13 @@ namespace RTLTMPro
         /// /// <returns>Converted number</returns>
         public static void FixNumbers(FastStringBuilder text, AramaicScript aramaicScript)
         {
-            var farsi = aramaicScript is AramaicScript.Persian;
-            text.Replace((char)EnglishNumbers.Zero, farsi ? (char)FarsiNumbers.Zero : (char)HinduNumbers.Zero);
-            text.Replace((char)EnglishNumbers.One, farsi ? (char)FarsiNumbers.One : (char)HinduNumbers.One);
-            text.Replace((char)EnglishNumbers.Two, farsi ? (char)FarsiNumbers.Two : (char)HinduNumbers.Two);
-            text.Replace((char)EnglishNumbers.Three, farsi ? (char)FarsiNumbers.Three : (char)HinduNumbers.Three);
-            text.Replace((char)EnglishNumbers.Four, farsi ? (char)FarsiNumbers.Four : (char)HinduNumbers.Four);
-            text.Replace((char)EnglishNumbers.Five, farsi ? (char)FarsiNumbers.Five : (char)HinduNumbers.Five);
-            text.Replace((char)EnglishNumbers.Six, farsi ? (char)FarsiNumbers.Six : (char)HinduNumbers.Six);
-            text.Replace((char)EnglishNumbers.Seven, farsi ? (char)FarsiNumbers.Seven : (char)HinduNumbers.Seven);
-            text.Replace((char)EnglishNumbers.Eight, farsi ? (char)FarsiNumbers.Eight : (char)HinduNumbers.Eight);
-            text.Replace((char)EnglishNumbers.Nine, farsi ? (char)FarsiNumbers.Nine : (char)HinduNumbers.Nine);
+            int targetZero = aramaicScript is AramaicScript.Persian ? (int)FarsiNumbers.Zero : (int)HinduNumbers.Zero;
+            for (int i = 0; i < text.Length; i++)
+            {
+                int character = text.Get(i);
+                if (character >= (int)EnglishNumbers.Zero && character <= (int)EnglishNumbers.Nine)
+                    text.Set(i, targetZero + character - (int)EnglishNumbers.Zero);
+            }
         }
 
         /// <summary>
@@ -293,7 +289,7 @@ namespace RTLTMPro
         /// /// <returns>Text with converted numbers</returns>
         public static void FixNumbersOutsideOfTags(FastStringBuilder text, AramaicScript aramaicScript)
         {
-            var englishDigits = new HashSet<char>(EnglishToFarsiNumberMap.Keys);
+            int targetZero = aramaicScript is AramaicScript.Persian ? (int)FarsiNumbers.Zero : (int)HinduNumbers.Zero;
             for (int i = 0; i < text.Length; i++)
             {
                 var iChar = text.Get(i);
@@ -319,9 +315,9 @@ namespace RTLTMPro
                     if (sawValidTag) continue;
                 }
 
-                if (englishDigits.Contains((char)iChar))
+                if (iChar >= (int)EnglishNumbers.Zero && iChar <= (int)EnglishNumbers.Nine)
                 {
-                    text.Set(i, aramaicScript is AramaicScript.Persian ? EnglishToFarsiNumberMap[(char)iChar] : EnglishToHinduNumberMap[(char)iChar]);
+                    text.Set(i, targetZero + iChar - (int)EnglishNumbers.Zero);
                 }
             }
         }

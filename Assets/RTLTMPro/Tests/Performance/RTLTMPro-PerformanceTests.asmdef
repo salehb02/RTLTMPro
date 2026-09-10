@@ -1,0 +1,12 @@
+{
+    "name": "RTLTMPro-PerformanceTests",
+    "references": ["RTLTMPro", "Unity.PerformanceTesting"],
+    "optionalUnityReferences": ["TestAssemblies"],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": []
+}

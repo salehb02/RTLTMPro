@@ -5,43 +5,9 @@ namespace RTLTMPro
 {
     public static class TashkeelFixer
     {
-        private static readonly List<TashkeelLocation> TashkeelLocations = new List<TashkeelLocation>(100);
-
-        private static readonly string ShaddaDammatan = new string(
-            new[] { (char)TashkeelCharacters.Shadda, (char)TashkeelCharacters.Dammatan });
-
-        private static readonly string ShaddaKasratan = new string(
-            new[] { (char)TashkeelCharacters.Shadda, (char)TashkeelCharacters.Kasratan });
-
-        private static readonly string ShaddaSuperscriptAlef = new string(
-            new[] { (char)TashkeelCharacters.Shadda, (char)TashkeelCharacters.SuperscriptAlef });
-
-        private static readonly string ShaddaFatha = new string(
-            new[] { (char)TashkeelCharacters.Shadda, (char)TashkeelCharacters.Fatha });
-
-        private static readonly string ShaddaDamma = new string(
-            new[] { (char)TashkeelCharacters.Shadda, (char)TashkeelCharacters.Damma });
-
-        private static readonly string ShaddaKasra = new string(
-            new[] { (char)TashkeelCharacters.Shadda, (char)TashkeelCharacters.Kasra });
-
-        private static readonly string ShaddaWithFathaIsolatedForm =
-            ((char)TashkeelCharacters.ShaddaWithFathaIsolatedForm).ToString();
-
-        private static readonly string ShaddaWithDammaIsolatedForm =
-            ((char)TashkeelCharacters.ShaddaWithDammaIsolatedForm).ToString();
-
-        private static readonly string ShaddaWithKasraIsolatedForm =
-            ((char)TashkeelCharacters.ShaddaWithKasraIsolatedForm).ToString();
-
-        private static readonly string ShaddaWithDammatanIsolatedForm =
-            ((char)TashkeelCharacters.ShaddaWithDammatanIsolatedForm).ToString();
-
-        private static readonly string ShaddaWithKasratanIsolatedForm =
-            ((char)TashkeelCharacters.ShaddaWithKasratanIsolatedForm).ToString();
-
-        private static readonly string ShaddaWithSuperscriptAlefIsolatedForm =
-            ((char)TashkeelCharacters.ShaddaWithSuperscriptAlefIsolatedForm).ToString();
+        [System.ThreadStatic] private static List<TashkeelLocation> tashkeelLocations;
+        private static List<TashkeelLocation> TashkeelLocations =>
+            tashkeelLocations ?? (tashkeelLocations = new List<TashkeelLocation>(100));
 
         private static readonly HashSet<char> TashkeelCharactersSet = new HashSet<char>() {
             (char)TashkeelCharacters.Fathan,
@@ -100,9 +66,27 @@ namespace RTLTMPro
         /// </summary>
         public static void RestoreTashkeel(FastStringBuilder letters)
         {
-            foreach (TashkeelLocation location in TashkeelLocations)
+            int markCount = TashkeelLocations.Count;
+            if (markCount == 0) return;
+
+            int originalLength = letters.Length;
+            letters.EnsureAdditionalCapacity(markCount);
+            letters.SetLengthUnchecked(originalLength + markCount);
+
+            int readIndex = originalLength - 1;
+            int markIndex = markCount - 1;
+            for (int writeIndex = originalLength + markCount - 1; writeIndex >= 0; writeIndex--)
             {
-                letters.Insert(location.Position, location.Tashkeel);
+                if (markIndex >= 0 && TashkeelLocations[markIndex].Position == writeIndex)
+                {
+                    letters.Set(writeIndex, (int)TashkeelLocations[markIndex].Tashkeel);
+                    markIndex--;
+                }
+                else
+                {
+                    letters.Set(writeIndex, letters.Get(readIndex));
+                    readIndex--;
+                }
             }
         }
 
@@ -121,9 +105,9 @@ namespace RTLTMPro
                 int curChar = input.Get(i);
                 int nextChar = i < input.Length - 1 ? input.Get(i + 1) : (char)0;
                 if ((TashkeelCharacters)curChar == TashkeelCharacters.Shadda
-                    && ShaddaCombinationMap.ContainsKey((char)nextChar))
+                    && ShaddaCombinationMap.TryGetValue((char)nextChar, out char combined))
                 {
-                    input.Set(j, ShaddaCombinationMap[(char)nextChar]);
+                    input.Set(j, combined);
                     j++;
                     i += 2;
                 }

@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.Text;
-using System.Text.RegularExpressions;
 
 #if RTL_LOCALIZATION
 using UnityEngine.Localization.Settings;
@@ -10,34 +8,6 @@ namespace RTLTMPro
 {
     public static class RTLNumberFixer
     {
-        private static readonly Dictionary<char, char> ENGLISH_TO_PERSIAN_DIGITS = new Dictionary<char, char>()
-        {
-            {'0' ,'۰'},
-            {'1','۱' },
-            {'2','۲' },
-            {'3','۳' },
-            {'4','۴' },
-            {'5','۵' },
-            {'6','۶' },
-            {'7','۷' },
-            {'8','۸' },
-            {'9','۹' },
-        };
-
-        private static readonly Dictionary<char, char> PERSIAN_TO_ENGLISH_DIGITS = new Dictionary<char, char>()
-        {
-            {'۰','0'},
-            {'۱','1' },
-            {'۲','2' },
-            {'۳','3' },
-            {'۴','4' },
-            {'۵','5' },
-            {'۶','6' },
-            {'۷','7' },
-            {'۸','8' },
-            {'۹','9' },
-        };
-
         public static string FixNumbers(string entry, bool farsi, bool forceFarsiNumbers)
         {
             bool isFa = farsi;
@@ -46,60 +16,94 @@ namespace RTLTMPro
             isFa = LocalizationSettings.SelectedLocale != null && LocalizationSettings.SelectedLocale.Identifier.Code.ToLower().Contains("fa");
 #endif
 
-            if (!isFa && !forceFarsiNumbers)
-                return entry;
-
-            string fixedStr = ConvertEnglishNumbersExceptTags(entry);
-            return fixedStr;
+            return isFa || forceFarsiNumbers ? ConvertEnglishNumbersExceptTags(entry) : entry;
         }
 
         private static string ConvertEnglishNumbersExceptTags(string input)
         {
-            Regex regex = new Regex(@"(<[^>]*>)|([^<]+)");
+            StringBuilder result = null;
+            int tagEnd = -1;
 
-            return regex.Replace(input, match =>
+            for (int i = 0; i < input.Length; i++)
             {
-                if (match.Value.StartsWith("<") && match.Value.EndsWith(">"))
-                    return match.Value;
+                char character = input[i];
+                if (i > tagEnd && character == '<')
+                    tagEnd = input.IndexOf('>', i + 1);
 
-                return ConvertToPersianDigits(match.Value);
-            });
+                if (i <= tagEnd || character < '0' || character > '9')
+                {
+                    if (result != null) result.Append(character);
+                    continue;
+                }
+
+                if (result == null)
+                {
+                    result = new StringBuilder(input.Length);
+                    result.Append(input, 0, i);
+                }
+
+                result.Append((char)((int)FarsiNumbers.Zero + character - '0'));
+            }
+
+            return result == null ? input : result.ToString();
         }
 
         public static string ConvertToPersianDigits(string value)
         {
-            StringBuilder finalStr = new StringBuilder();
-
+            StringBuilder result = null;
             for (int i = 0; i < value.Length; i++)
             {
-                if (ENGLISH_TO_PERSIAN_DIGITS.ContainsKey(value[i]))
+                char character = value[i];
+                if (character >= '0' && character <= '9')
                 {
-                    finalStr.Append(ENGLISH_TO_PERSIAN_DIGITS[value[i]]);
-                    continue;
+                    if (result == null)
+                    {
+                        result = new StringBuilder(value.Length);
+                        result.Append(value, 0, i);
+                    }
+                    result.Append((char)((int)FarsiNumbers.Zero + character - '0'));
                 }
-
-                finalStr.Append(value[i]);
+                else if (result != null)
+                {
+                    result.Append(character);
+                }
             }
 
-            return finalStr.ToString();
+            return result == null ? value : result.ToString();
         }
 
         public static string ConvertToEnglishDigits(string value)
         {
-            StringBuilder finalStr = new StringBuilder();
-
+            StringBuilder result = null;
             for (int i = 0; i < value.Length; i++)
             {
-                if (PERSIAN_TO_ENGLISH_DIGITS.ContainsKey(value[i]))
+                char character = value[i];
+                if (character >= (char)FarsiNumbers.Zero && character <= (char)FarsiNumbers.Nine)
                 {
-                    finalStr.Append(PERSIAN_TO_ENGLISH_DIGITS[value[i]]);
-                    continue;
+                    if (result == null)
+                    {
+                        result = new StringBuilder(value.Length);
+                        result.Append(value, 0, i);
+                    }
+                    result.Append((char)('0' + character - (char)FarsiNumbers.Zero));
                 }
-
-                finalStr.Append(value[i]);
+                else if (result != null)
+                {
+                    result.Append(character);
+                }
             }
 
-            return finalStr.ToString();
+            return result == null ? value : result.ToString();
+        }
+
+        public static void ConvertToEnglishDigits(FastStringBuilder value)
+        {
+            for (int i = 0; i < value.Length; i++)
+            {
+                int character = value.Get(i);
+                if (character >= (int)FarsiNumbers.Zero && character <= (int)FarsiNumbers.Nine)
+                    value.Set(i, '0' + character - (int)FarsiNumbers.Zero);
+            }
         }
     }
 }

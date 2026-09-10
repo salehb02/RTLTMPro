@@ -4,8 +4,10 @@ namespace RTLTMPro
 {
     public static class LigatureFixer
     {
-        private static readonly List<int> LtrTextHolder = new List<int>(512);
-        private static readonly List<int> TagTextHolder = new List<int>(512);
+        [System.ThreadStatic] private static List<int> ltrTextHolder;
+        [System.ThreadStatic] private static List<int> tagTextHolder;
+        private static List<int> LtrTextHolder => ltrTextHolder ?? (ltrTextHolder = new List<int>(512));
+        private static List<int> TagTextHolder => tagTextHolder ?? (tagTextHolder = new List<int>(512));
         private static readonly Dictionary<char, char> MirroredCharsMap = new Dictionary<char, char>()
         {
             ['('] = ')',
@@ -17,7 +19,6 @@ namespace RTLTMPro
             ['['] = ']',
             [']'] = '[',
         };
-        private static readonly HashSet<char> MirroredCharsSet = new HashSet<char>(MirroredCharsMap.Keys);
         private static void FlushBufferToOutput(List<int> buffer, FastStringBuilder output)
         {
             for (int j = 0; j < buffer.Count; j++)
@@ -98,7 +99,7 @@ namespace RTLTMPro
 
                 if (Char32Utils.IsPunctuation(characterAtThisIndex) || Char32Utils.IsSymbol(characterAtThisIndex))
                 {
-                    if (MirroredCharsSet.Contains((char)characterAtThisIndex))
+                    if (MirroredCharsMap.TryGetValue((char)characterAtThisIndex, out char mirroredCharacter))
                     {
                         // IsRTLCharacter returns false for null
                         bool isAfterRTLCharacter = Char32Utils.IsRTLCharacter(previousCharacter);
@@ -106,7 +107,7 @@ namespace RTLTMPro
 
                         if (isAfterRTLCharacter || isBeforeRTLCharacter)
                         {
-                            characterAtThisIndex = MirroredCharsMap[(char)characterAtThisIndex];
+                            characterAtThisIndex = mirroredCharacter;
                         }
                     }
 

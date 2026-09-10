@@ -5,6 +5,14 @@ namespace Tests
 {
     public class RTLSupportTests
     {
+        [Test]
+        public void FixRTL_RestoresConsecutiveTashkeel()
+        {
+            var output = new FastStringBuilder(8);
+            RTLSupport.FixRTL("aَُِb", output, AramaicScript.Arabic, false, true);
+            Assert.AreEqual("bَُِa", output.ToString());
+        }
+
         // Base Tests
         [TestCase("هَذَا النَّص العربي", "ﻲﺑﺮﻌﻟﺍ ﺺﱠﻨﻟﺍ ﺍَﺬَﻫ", AramaicScript.Arabic, true, true, TestName = "Arabic text is successfully converted")]
         [TestCase("متن فارسی", "ﯽﺳﺭﺎﻓ ﻦﺘﻣ", AramaicScript.Persian, true, true, TestName = "Farsi text is successfully converted")]

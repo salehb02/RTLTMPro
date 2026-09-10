@@ -80,7 +80,7 @@ namespace RTLTMPro
         public void SetValue(FastStringBuilder other)
         {
             EnsureCapacity(other.length, false);
-            Copy(other.array, array);
+            Array.Copy(other.array, 0, array, 0, other.length);
             length = other.length;
         }
 
@@ -110,15 +110,8 @@ namespace RTLTMPro
             length += count;
             EnsureCapacity(length, true);
 
-            for (int i = length - count - 1; i >= pos; i--)
-            {
-                array[i + count] = array[i];
-            }
-
-            for (int i = 0; i < count; i++)
-            {
-                array[pos + i] = str.array[offset + i];
-            }
+            Array.Copy(array, pos, array, pos + count, length - count - pos);
+            Array.Copy(str.array, offset, array, pos, count);
         }
 
         public void Insert(int pos, FastStringBuilder str)
@@ -131,8 +124,7 @@ namespace RTLTMPro
             length++;
             EnsureCapacity(length, true);
 
-            for (int i = length - 2; i >= pos; i--)
-                array[i + 1] = array[i];
+            Array.Copy(array, pos, array, pos + 1, length - pos - 1);
 
             array[pos] = ch;
         }
@@ -154,10 +146,7 @@ namespace RTLTMPro
 
         public void Remove(int start, int length)
         {
-            for (int i = start; i < this.length - length; i++)
-            {
-                array[i] = array[i + length];
-            }
+            Array.Copy(array, start + length, array, start, this.length - start - length);
 
             this.length -= length;
         }
@@ -191,10 +180,22 @@ namespace RTLTMPro
 
         public override string ToString()
         {
-            StringBuilder sb = new StringBuilder();
+            if (length == 0) return string.Empty;
+
+            StringBuilder sb = new StringBuilder(length);
             for (int i = 0; i < length; i++)
             {
-                sb.Append(char.ConvertFromUtf32(array[i]));
+                int codePoint = array[i];
+                if (codePoint <= 0xFFFF)
+                {
+                    sb.Append((char)codePoint);
+                }
+                else
+                {
+                    codePoint -= 0x10000;
+                    sb.Append((char)((codePoint >> 10) + 0xD800));
+                    sb.Append((char)((codePoint & 0x3FF) + 0xDC00));
+                }
             }
             return sb.ToString();
         }
@@ -221,7 +222,9 @@ namespace RTLTMPro
 
         public void Replace(FastStringBuilder oldStr, FastStringBuilder newStr)
         {
-            for (int i = 0; i < length; i++)
+            if (oldStr.Length == 0) return;
+
+            for (int i = 0; i <= length - oldStr.Length; i++)
             {
                 bool match = true;
                 for (int j = 0; j < oldStr.Length; j++)
@@ -303,7 +306,7 @@ namespace RTLTMPro
             if (keepValues)
             {
                 int[] newArray = new int[capacity];
-                Copy(array, newArray);
+                Array.Copy(array, 0, newArray, 0, length);
                 array = newArray;
             }
             else
@@ -312,10 +315,14 @@ namespace RTLTMPro
             }
         }
 
-        private static void Copy(int[] src, int[] dst)
+        internal void EnsureAdditionalCapacity(int additionalLength)
         {
-            for (int i = 0; i < src.Length; i++)
-                dst[i] = src[i];
+            EnsureCapacity(length + additionalLength, true);
+        }
+
+        internal void SetLengthUnchecked(int value)
+        {
+            length = value;
         }
     }
 }

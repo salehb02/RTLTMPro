@@ -5,6 +5,14 @@ namespace RTLTMPro.Tests
 {
     public class GlyphFixerTests
     {
+        [Test]
+        public void FixNumbersOutsideOfTags_DoesNotConvertTagValues()
+        {
+            var text = new FastStringBuilder("123 <size=456>789</size>");
+            GlyphFixer.FixNumbersOutsideOfTags(text, AramaicScript.Persian);
+            Assert.AreEqual("۱۲۳ <size=456>۷۸۹</size>", text.ToString());
+        }
+
         private static FastStringBuilder GetEnglishNumbers()
         {
             var text = new FastStringBuilder(10);

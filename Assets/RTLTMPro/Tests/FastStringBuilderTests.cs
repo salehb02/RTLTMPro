@@ -8,6 +8,13 @@ namespace RTLTMPro.Tests
     public class FastFastStringBuilderTests
     {
         [Test]
+        public void ToString_PreservesSupplementaryUnicodeCharacters()
+        {
+            const string expected = "فارسی 😀 🚀 text";
+            Assert.AreEqual(expected, new FastStringBuilder(expected).ToString());
+        }
+
+        [Test]
         public void SetValue_SetsTheValueOfStringBuilderWithProvidedText()
         {
             var builder = new FastStringBuilder(10);

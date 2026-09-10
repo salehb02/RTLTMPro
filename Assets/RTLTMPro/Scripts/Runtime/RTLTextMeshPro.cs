@@ -132,7 +132,7 @@ namespace RTLTMPro
                 base.text = GetFixedText(originalText);
             }
 
-            havePropertiesChanged = true;
+            havePropertiesChanged = false;
         }
 
         private string GetFixedText(string input)
@@ -141,7 +141,7 @@ namespace RTLTMPro
                 return input;
 
             finalText.Clear();
-            RTLSupport.FixRTL(RTLNumberFixer.ConvertToEnglishDigits(input), finalText, aramaicScript, fixTags, true, CheckSupportChar);
+            RTLSupport.FixRTL(input, finalText, aramaicScript, fixTags, true, CheckSupportChar, true);
             finalText.Reverse();
             return RTLNumberFixer.FixNumbers(finalText.ToString(), farsi, forceFarsiNumbers);
         }
