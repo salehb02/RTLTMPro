@@ -1,3 +1,61 @@
+> # RTLTMPro Fork - Updates and Optional Integrations
+>
+> ## What's New
+>
+> - Added Kurdish language support, including a Kurdish character range, font asset, and demo scene.
+> - Added Context Menu conversion from legacy `Text` and `TextMeshProUGUI` components to `RTLTextMeshPro`.
+> - Added optional Unity Localization integration for locale-aware Persian digit conversion.
+> - Added optional Unicode emoji support through Emoji Search API and TextMeshPro sprite assets.
+> - Improved RTL processing performance and added performance tests.
+> - Improved Unity 6 compatibility for shaders, editor menus, and Prefab Mode.
+> - Fixed Persian number ordering and several RTL shaping edge cases.
+>
+> ## Installing This Fork
+>
+> 1. Download or clone `https://github.com/salehb02/RTLTMPro`.
+> 2. Copy the `Assets/RTLTMPro` folder into your Unity project's `Assets` folder.
+> 3. Make sure TextMeshPro is installed through Unity Package Manager.
+> 4. Optionally install the integrations below when your project needs them.
+>
+> ## Optional Integrations
+>
+> These packages are optional. Their integrations are enabled automatically through Assembly Definition `versionDefines`; no manual Scripting Define Symbol is required.
+>
+> ### Unity Localization
+>
+> Use this integration when the displayed number format should follow the currently selected locale.
+>
+> #### Installation
+>
+> 1. Open `Window > Package Management > Package Manager`.
+> 2. Install `Localization` from the Unity Registry, or select `Install package by name` and enter `com.unity.localization`.
+> 3. Configure the project's locales and set the active locale through Unity Localization.
+>
+> When `com.unity.localization` is installed, `RTL_LOCALIZATION` is defined automatically. `RTLTextMeshPro` then converts English digits to Persian digits when the selected locale code contains `fa`. The `Force Farsi Numbers` option can still be used to force Persian digits regardless of the active locale.
+>
+> ### Emoji Search API
+>
+> Use this integration to render Unicode emoji sequences with a TextMeshPro Sprite Asset.
+>
+> #### Installation
+>
+> 1. Open `Window > Package Management > Package Manager`.
+> 2. Press the add button `+` and select `Install package from git URL`.
+> 3. Enter `https://gitlab.com/KyubInteractive/emojisearchapi.git#com.kyub.emojisearch-1.1.5`.
+> 4. Assign an emoji-compatible `TMP Sprite Asset` to the `RTLTextMeshPro` component or configure it as TextMeshPro's default sprite asset.
+> 5. Use Unicode emoji directly in the text. Supported emoji sequences are converted to TextMeshPro sprite tags automatically.
+>
+> When `com.kyub.emojisearch` is installed, `RTL_EMOJI` is defined automatically.
+>
+> ## Benchmark Comparison
+>
+> <!-- Add benchmark images here. Example:
+> ![Before optimization](Screenshots/Benchmark-Before.png)
+> ![After optimization](Screenshots/Benchmark-After.png)
+> -->
+
+---
+
 # RTL Text Mesh Pro
 This plugin adds Right-to-left language support to "TextMeshPro" Unity plugin. 
 You need to have `TextMeshPro` plugin in your project. You can install TMPro via `Package Manager`.
