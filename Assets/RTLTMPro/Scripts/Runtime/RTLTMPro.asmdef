@@ -3,7 +3,8 @@
     "rootNamespace": "",
     "references": [
         "Unity.TextMeshPro",
-        "Unity.Localization"
+        "Unity.Localization",
+        "Kyub.EmojiSearch"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -22,6 +23,11 @@
             "name": "com.unity.localization",
             "expression": "1.0.0",
             "define": "RTL_LOCALIZATION"
+        },
+        {
+            "name": "com.kyub.emojisearch",
+            "expression": "1.0.0",
+            "define": "RTL_EMOJI"
         }
     ],
     "noEngineReferences": false
