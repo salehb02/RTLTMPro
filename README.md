@@ -11,10 +11,11 @@
 >
 > ## Installing This Fork
 >
-> 1. Download or clone `https://github.com/salehb02/RTLTMPro`.
-> 2. Copy the `Assets/RTLTMPro` folder into your Unity project's `Assets` folder.
-> 3. Make sure TextMeshPro is installed through Unity Package Manager.
-> 4. Optionally install the integrations below when your project needs them.
+> 1. Install TextMeshPro through Unity Package Manager.
+> 2. Open the [Releases](https://github.com/salehb02/RTLTMPro/releases) page and download the latest `.unitypackage` file.
+> 3. In Unity, open `Assets > Import Package > Custom Package...`.
+> 4. Select the downloaded package and press `Import`.
+> 5. Install the optional integrations below only when your project needs them.
 >
 > ## Optional Integrations
 >
