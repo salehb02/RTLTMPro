@@ -125,26 +125,27 @@ namespace RTLTMPro
             }
         }
 
-        private static bool TryGetShaddaCombination(char mark, out int combined)
+        // Takes the full code point, so a character above U+FFFF never matches a mark by its low 16 bits.
+        private static bool TryGetShaddaCombination(int mark, out int combined)
         {
             switch (mark)
             {
-                case (char)TashkeelCharacters.Dammatan:
+                case (int)TashkeelCharacters.Dammatan:
                     combined = (int)TashkeelCharacters.ShaddaWithDammatanIsolatedForm;
                     return true;
-                case (char)TashkeelCharacters.Kasratan:
+                case (int)TashkeelCharacters.Kasratan:
                     combined = (int)TashkeelCharacters.ShaddaWithKasratanIsolatedForm;
                     return true;
-                case (char)TashkeelCharacters.Fatha:
+                case (int)TashkeelCharacters.Fatha:
                     combined = (int)TashkeelCharacters.ShaddaWithFathaIsolatedForm;
                     return true;
-                case (char)TashkeelCharacters.Damma:
+                case (int)TashkeelCharacters.Damma:
                     combined = (int)TashkeelCharacters.ShaddaWithDammaIsolatedForm;
                     return true;
-                case (char)TashkeelCharacters.Kasra:
+                case (int)TashkeelCharacters.Kasra:
                     combined = (int)TashkeelCharacters.ShaddaWithKasraIsolatedForm;
                     return true;
-                case (char)TashkeelCharacters.SuperscriptAlef:
+                case (int)TashkeelCharacters.SuperscriptAlef:
                     combined = (int)TashkeelCharacters.ShaddaWithSuperscriptAlefIsolatedForm;
                     return true;
                 default:
@@ -175,7 +176,7 @@ namespace RTLTMPro
                 int curChar = arr[i];
                 if (curChar == (int)TashkeelCharacters.Shadda
                     && i < len - 1
-                    && TryGetShaddaCombination((char)arr[i + 1], out int combined))
+                    && TryGetShaddaCombination(arr[i + 1], out int combined))
                 {
                     arr[j++] = combined;
                     i += 2;

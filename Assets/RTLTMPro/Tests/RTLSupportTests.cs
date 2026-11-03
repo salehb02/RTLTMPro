@@ -13,6 +13,17 @@ namespace Tests
             Assert.AreEqual("bَُِa", output.ToString());
         }
 
+        // Code points above U+FFFF must not be matched by their low 16 bits (U+20627 is a CJK ideograph, not Alef).
+        [TestCase("\u0628\U00020627\u0628", "\uFE8F\U00020627\uFE8F", TestName = "Supplementary code point is not shaped or joined as an Arabic letter")]
+        [TestCase("\u0628\u0651\U0002064E", "\U0002064E\u0651\uFE8F", TestName = "Shadda is not combined with a supplementary code point")]
+        [TestCase("\u0628\u0651\u064E", "\uFC60\uFE8F", TestName = "Shadda is still combined with Fatha")]
+        public void FixRTL_SupplementaryCodePoints(string input, string expected)
+        {
+            var output = new FastStringBuilder(16);
+            RTLSupport.FixRTL(input, output, AramaicScript.Arabic, false, true);
+            Assert.AreEqual(expected, output.ToString());
+        }
+
         // Base Tests
         [TestCase("هَذَا النَّص العربي", "ﻲﺑﺮﻌﻟﺍ ﺺﱠﻨﻟﺍ ﺍَﺬَﻫ", AramaicScript.Arabic, true, true, TestName = "Arabic text is successfully converted")]
         [TestCase("متن فارسی", "ﯽﺳﺭﺎﻓ ﻦﺘﻣ", AramaicScript.Persian, true, true, TestName = "Farsi text is successfully converted")]

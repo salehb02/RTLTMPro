@@ -60,24 +60,13 @@ namespace RTLTMPro
 
         /// <summary>
         ///     <see cref="ConnectsToNextFlag"/> / <see cref="ConnectsToPreviousFlag"/> for a code point.
+        ///     Anything outside U+0600..U+06FF, including every code point above U+FFFF, never connects.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int GetConnectionFlags(int character)
         {
             uint index = (uint)(character - GlyphTable.BlockStart);
-            if (index < GlyphTable.BlockSize) return LetterFlags[index];
-            return character > 0xFFFF ? GetSupplementaryConnectionFlags(character) : 0;
-        }
-
-        private static int GetSupplementaryConnectionFlags(int character)
-        {
-            // The connection checks have always tested the code point truncated to 16 bits, so a code point
-            // above U+FFFF whose low 16 bits are a known letter counts as connecting on both sides.
-            // Kept as-is so the output does not change.
-            uint index = (uint)((char)character - GlyphTable.BlockStart);
-            return index < GlyphTable.BlockSize && (LetterFlags[index] & GlyphFixedFlag) != 0
-                ? ConnectsToNextFlag | ConnectsToPreviousFlag
-                : 0;
+            return index < GlyphTable.BlockSize ? LetterFlags[index] : 0;
         }
 
         /// <summary>
@@ -113,11 +102,12 @@ namespace RTLTMPro
                     continue;
                 }
 
-                char converted = (char)iChar;
-                uint letterIndex = (uint)(converted - GlyphTable.BlockStart);
+                // Index with the full code point: truncating to 16 bits first would shape e.g. U+20627 as Alef.
+                uint letterIndex = (uint)(iChar - GlyphTable.BlockStart);
                 if (letterIndex >= GlyphTable.BlockSize || (LetterFlags[letterIndex] & GlyphFixedFlag) == 0)
                     continue;
 
+                char converted = (char)iChar;
                 if (!isKurdish || converted != (char)ConstantChars.KurdishHa)
                     converted = GlyphTable.Convert(converted);
 
