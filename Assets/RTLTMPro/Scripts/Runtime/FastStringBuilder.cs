@@ -5,6 +5,9 @@ namespace RTLTMPro
 {
     public class FastStringBuilder
     {
+        // Shared scratch buffer for ToString(), so converting to string allocates only the result.
+        [ThreadStatic] private static char[] charBuffer;
+
         // Using fields to be as efficient as possible
         private int length;
         public int Length
@@ -16,14 +19,12 @@ namespace RTLTMPro
             }
         }
         private int[] array;
-        private int capacity;
 
         public FastStringBuilder(int capacity)
         {
             if (capacity < 0)
                 throw new ArgumentOutOfRangeException(nameof(capacity));
 
-            this.capacity = capacity;
             array = new int[capacity];
         }
 
@@ -46,6 +47,16 @@ namespace RTLTMPro
             return new FastStringBuilder(x);
         }
 
+        /// <summary>
+        ///     Backing array for tight internal loops. Only the first <see cref="Length"/> items are valid,
+        ///     and the reference changes whenever the builder grows.
+        /// </summary>
+        internal int[] RawArray
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return array; }
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int Get(int index)
         {
@@ -60,18 +71,28 @@ namespace RTLTMPro
 
         public void SetValue(string text)
         {
-            int len = 0;
-            length = text.Length;
-            EnsureCapacity(length, false);
+            int textLength = text.Length;
+            EnsureCapacity(textLength, false);
 
-            for (int i = 0; i < text.Length; i++)
+            int[] arr = array;
+            int len = 0;
+            for (int i = 0; i < textLength; i++)
             {
+                char ch = text[i];
+                if ((uint)(ch - 0xD800) > 0x7FF)
+                {
+                    // Not a surrogate: the code point is the char itself.
+                    arr[len++] = ch;
+                    continue;
+                }
+
+                // Surrogates go through ConvertToUtf32 so malformed pairs still throw like before.
                 int unicode32CodePoint = char.ConvertToUtf32(text, i);
                 if (unicode32CodePoint > 0xffff)
                 {
                     i++;
                 }
-                array[len++] = unicode32CodePoint;
+                arr[len++] = unicode32CodePoint;
             }
 
             length = len;
@@ -86,20 +107,18 @@ namespace RTLTMPro
 
         public void Append(int ch)
         {
-            length++;
-            if (capacity < length)
-                EnsureCapacity(length, true);
+            if (length == array.Length)
+                EnsureCapacity(length + 1, true);
 
-            array[length - 1] = ch;
+            array[length++] = ch;
         }
 
         public void Append(char ch)
         {
-            length++;
-            if (capacity < length)
-                EnsureCapacity(length, true);
+            if (length == array.Length)
+                EnsureCapacity(length + 1, true);
 
-            array[length - 1] = ch;
+            array[length++] = ch;
         }
 
         public void Insert(int pos, FastStringBuilder str, int offset, int count)
@@ -107,11 +126,11 @@ namespace RTLTMPro
             if (str == this) throw new InvalidOperationException("You cannot pass the same string builder to insert");
             if (count == 0) return;
 
-            length += count;
-            EnsureCapacity(length, true);
+            EnsureCapacity(length + count, true);
 
-            Array.Copy(array, pos, array, pos + count, length - count - pos);
+            Array.Copy(array, pos, array, pos + count, length - pos);
             Array.Copy(str.array, offset, array, pos, count);
+            length += count;
         }
 
         public void Insert(int pos, FastStringBuilder str)
@@ -121,24 +140,25 @@ namespace RTLTMPro
 
         public void Insert(int pos, int ch)
         {
-            length++;
-            EnsureCapacity(length, true);
+            EnsureCapacity(length + 1, true);
 
-            Array.Copy(array, pos, array, pos + 1, length - pos - 1);
+            Array.Copy(array, pos, array, pos + 1, length - pos);
 
             array[pos] = ch;
+            length++;
         }
 
         public void RemoveAll(int character)
         {
+            int[] arr = array;
+            int len = length;
             int j = 0; // write index
-            int i = 0; // read index
-            for (; i < length; i++)
+            for (int i = 0; i < len; i++)
             {
-                if (array[i] == character) continue;
+                int ch = arr[i];
+                if (ch == character) continue;
 
-                array[j] = array[i];
-                j++;
+                arr[j++] = ch;
             }
 
             length = j;
@@ -153,16 +173,16 @@ namespace RTLTMPro
 
         public void Reverse(int startIndex, int length)
         {
-            for (int i = 0; i < length / 2; i++)
+            int[] arr = array;
+            int i = startIndex;
+            int j = startIndex + length - 1;
+            while (i < j)
             {
-                int firstIndex = startIndex + i;
-                int secondIndex = startIndex + length - i - 1;
-
-                int first = array[firstIndex];
-                int second = array[secondIndex];
-
-                array[firstIndex] = second;
-                array[secondIndex] = first;
+                int first = arr[i];
+                arr[i] = arr[j];
+                arr[j] = first;
+                i++;
+                j--;
             }
         }
 
@@ -174,30 +194,39 @@ namespace RTLTMPro
         public void Substring(FastStringBuilder output, int start, int length)
         {
             output.length = 0;
-            for (int i = 0; i < length; i++)
-                output.Append(array[start + i]);
+            output.EnsureCapacity(length, false);
+            Array.Copy(array, start, output.array, 0, length);
+            output.length = length;
         }
 
         public override string ToString()
         {
-            if (length == 0) return string.Empty;
+            int len = length;
+            if (len == 0) return string.Empty;
 
-            StringBuilder sb = new StringBuilder(length);
-            for (int i = 0; i < length; i++)
+            // Worst case every code point needs a surrogate pair.
+            int maxChars = len * 2;
+            char[] buffer = charBuffer;
+            if (buffer == null || buffer.Length < maxChars)
+                charBuffer = buffer = new char[Math.Max(maxChars, 256)];
+
+            int[] arr = array;
+            int charCount = 0;
+            for (int i = 0; i < len; i++)
             {
-                int codePoint = array[i];
+                int codePoint = arr[i];
                 if (codePoint <= 0xFFFF)
                 {
-                    sb.Append((char)codePoint);
+                    buffer[charCount++] = (char)codePoint;
                 }
                 else
                 {
                     codePoint -= 0x10000;
-                    sb.Append((char)((codePoint >> 10) + 0xD800));
-                    sb.Append((char)((codePoint & 0x3FF) + 0xDC00));
+                    buffer[charCount++] = (char)((codePoint >> 10) + 0xD800);
+                    buffer[charCount++] = (char)((codePoint & 0x3FF) + 0xDC00);
                 }
             }
-            return sb.ToString();
+            return new string(buffer, 0, charCount);
         }
 
         public string ToDebugString()
@@ -213,23 +242,28 @@ namespace RTLTMPro
 
         public void Replace(int oldChar, int newChar)
         {
-            for (int i = 0; i < length; i++)
+            int[] arr = array;
+            int len = length;
+            for (int i = 0; i < len; i++)
             {
-                if (array[i] == oldChar)
-                    array[i] = newChar;
+                if (arr[i] == oldChar)
+                    arr[i] = newChar;
             }
         }
 
         public void Replace(FastStringBuilder oldStr, FastStringBuilder newStr)
         {
-            if (oldStr.Length == 0) return;
+            int oldLength = oldStr.length;
+            int newLength = newStr.length;
+            if (oldLength == 0) return;
 
-            for (int i = 0; i <= length - oldStr.Length; i++)
+            int[] oldArr = oldStr.array;
+            for (int i = 0; i <= length - oldLength; i++)
             {
                 bool match = true;
-                for (int j = 0; j < oldStr.Length; j++)
+                for (int j = 0; j < oldLength; j++)
                 {
-                    if (array[i + j] != oldStr.Get(j))
+                    if (array[i + j] != oldArr[j])
                     {
                         match = false;
                         break;
@@ -238,52 +272,19 @@ namespace RTLTMPro
 
                 if (!match) continue;
 
-                if (oldStr.Length == newStr.Length)
+                if (oldLength != newLength)
                 {
-                    for (int k = 0; k < oldStr.Length; k++)
-                    {
-                        array[i + k] = newStr.Get(k);
-                    }
-                }
-                else if (oldStr.Length < newStr.Length)
-                {
-                    // We need to expand capacity
-                    int diff = newStr.Length - oldStr.Length;
-                    length += diff;
-                    EnsureCapacity(length, true);
-
-                    // Move everything forward by difference of length
-                    for (int k = length - diff - 1; k >= i + oldStr.Length; k--)
-                    {
-                        array[k + diff] = array[k];
-                    }
-
-                    // Start writing new string
-                    for (int k = 0; k < newStr.Length; k++)
-                    {
-                        array[i + k] = newStr.Get(k);
-                    }
-                }
-                else
-                {
-                    // We need to shrink
-                    int diff = oldStr.Length - newStr.Length;
-
-                    // Move everything backwards by diff
-                    for (int k = i + diff; k < length - diff; k++)
-                    {
-                        array[k] = array[k + diff];
-                    }
-
-                    for (int k = 0; k < newStr.Length; k++)
-                    {
-                        array[i + k] = newStr.Get(k);
-                    }
-
-                    length -= diff;
+                    // Shift the tail to make room for (or close the gap left by) the replacement
+                    int tailStart = i + oldLength;
+                    int newTotalLength = length - oldLength + newLength;
+                    EnsureCapacity(newTotalLength, true);
+                    Array.Copy(array, tailStart, array, i + newLength, length - tailStart);
+                    length = newTotalLength;
                 }
 
-                i += newStr.Length;
+                Array.Copy(newStr.array, 0, array, i, newLength);
+
+                i += newLength;
             }
         }
 
@@ -292,8 +293,14 @@ namespace RTLTMPro
             length = 0;
         }
 
+        /// <summary>
+        ///     Makes sure the backing array can hold <paramref name="cap"/> items.
+        ///     Must be called before <see cref="length"/> is increased, since the first
+        ///     <see cref="length"/> items are what gets copied when growing.
+        /// </summary>
         private void EnsureCapacity(int cap, bool keepValues)
         {
+            int capacity = array.Length;
             if (capacity >= cap)
                 return;
 
@@ -303,16 +310,11 @@ namespace RTLTMPro
             while (capacity < cap)
                 capacity *= 2;
 
+            int[] newArray = new int[capacity];
             if (keepValues)
-            {
-                int[] newArray = new int[capacity];
                 Array.Copy(array, 0, newArray, 0, length);
-                array = newArray;
-            }
-            else
-            {
-                array = new int[capacity];
-            }
+
+            array = newArray;
         }
 
         internal void EnsureAdditionalCapacity(int additionalLength)

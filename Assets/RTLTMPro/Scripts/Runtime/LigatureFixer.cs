@@ -1,32 +1,98 @@
-using System.Collections.Generic;
+using System.Globalization;
+using System.Runtime.CompilerServices;
 
 namespace RTLTMPro
 {
     public static class LigatureFixer
     {
-        [System.ThreadStatic] private static List<int> ltrTextHolder;
-        [System.ThreadStatic] private static List<int> tagTextHolder;
-        private static List<int> LtrTextHolder => ltrTextHolder ?? (ltrTextHolder = new List<int>(512));
-        private static List<int> TagTextHolder => tagTextHolder ?? (tagTextHolder = new List<int>(512));
-        private static readonly Dictionary<char, char> MirroredCharsMap = new Dictionary<char, char>()
+        private static bool TryGetMirroredCharacter(int character, out int mirrored)
         {
-            ['('] = ')',
-            [')'] = '(',
-            ['»'] = '«',
-            ['«'] = '»',
-            ['{'] = '}',
-            ['}'] = '{',
-            ['['] = ']',
-            [']'] = '[',
-        };
-        private static void FlushBufferToOutput(List<int> buffer, FastStringBuilder output)
-        {
-            for (int j = 0; j < buffer.Count; j++)
+            switch (character)
             {
-                output.Append(buffer[buffer.Count - 1 - j]);
+                case '(': mirrored = ')'; return true;
+                case ')': mirrored = '('; return true;
+                case '»': mirrored = '«'; return true;
+                case '«': mirrored = '»'; return true;
+                case '{': mirrored = '}'; return true;
+                case '}': mirrored = '{'; return true;
+                case '[': mirrored = ']'; return true;
+                case ']': mirrored = '['; return true;
+                default: mirrored = character; return false;
             }
+        }
 
-            buffer.Clear();
+        // Nearly every character this fixer sees is ASCII, Arabic (U+0600..U+06FF) or an Arabic presentation form
+        // (U+FB50..U+FEFF), so the punctuation/symbol answer for those ranges is precomputed from the same API.
+        private const int LowRangeEnd = 0x0700;
+        private const int PresentationFormsStart = 0xFB50;
+        private const int PresentationFormsEnd = 0xFF00;
+        private static readonly bool[] LowRangePunctuationOrSymbol = BuildPunctuationOrSymbolTable(0, LowRangeEnd);
+        private static readonly bool[] PresentationFormsPunctuationOrSymbol =
+            BuildPunctuationOrSymbolTable(PresentationFormsStart, PresentationFormsEnd);
+
+        private static bool[] BuildPunctuationOrSymbolTable(int start, int end)
+        {
+            var table = new bool[end - start];
+            for (int i = 0; i < table.Length; i++)
+                table[i] = IsPunctuationOrSymbolCategory((char)(start + i));
+            return table;
+        }
+
+        /// <summary>
+        ///     Same as <c>char.IsPunctuation(ch) || char.IsSymbol(ch)</c> with a single category lookup.
+        /// </summary>
+        private static bool IsPunctuationOrSymbolCategory(char character)
+        {
+            UnicodeCategory category = char.GetUnicodeCategory(character);
+            return category >= UnicodeCategory.ConnectorPunctuation && category <= UnicodeCategory.OtherSymbol;
+        }
+
+        /// <summary>
+        ///     Same as <c>Char32Utils.IsPunctuation(ch) || Char32Utils.IsSymbol(ch)</c>.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsPunctuationOrSymbol(int character)
+        {
+            if ((uint)character < LowRangeEnd) return LowRangePunctuationOrSymbol[character];
+
+            uint presentationIndex = (uint)(character - PresentationFormsStart);
+            if (presentationIndex < PresentationFormsEnd - PresentationFormsStart)
+                return PresentationFormsPunctuationOrSymbol[presentationIndex];
+
+            return Char32Utils.IsUnicode16Char(character) && IsPunctuationOrSymbolCategory((char)character);
+        }
+
+        /// <summary>
+        ///     Same as <see cref="Char32Utils.IsEnglishLetter"/>: setting bit 5 folds A-Z onto a-z.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsEnglishLetter(int character)
+        {
+            return (uint)((character | 0x20) - 'a') <= 'z' - 'a';
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsNumber(int character, int zero)
+        {
+            return (uint)(character - zero) <= 9;
+        }
+
+        private static bool IsLtrNeighbour(int character, int zero)
+        {
+            return IsEnglishLetter(character) || IsNumber(character, zero) || Char32Utils.IsSymbol(character);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void Reverse(int[] array, int start, int end)
+        {
+            while (start < end)
+            {
+                int temp = array[start];
+                array[start] = array[end];
+                array[end] = temp;
+                start++;
+                end--;
+            }
         }
 
         /// <summary>
@@ -34,87 +100,76 @@ namespace RTLTMPro
         /// </summary>
         public static void Fix(FastStringBuilder input, FastStringBuilder output, AramaicScript aramaicScript, bool fixTextTags, bool preserveNumbers)
         {
+            int length = input.Length;
+            int[] text = input.RawArray;
+
+            // Every input character is written at most once, so reserve the room once and write straight into the array.
+            output.EnsureAdditionalCapacity(length);
+            int[] result = output.RawArray;
+            int resultLength = output.Length;
+
             // Some texts like tags, English words and numbers need to be displayed in their original order.
-            // This list keeps the characters that their order should be reserved and streams reserved texts into final letters.
-            LtrTextHolder.Clear();
-            TagTextHolder.Clear();
-            for (int i = input.Length - 1; i >= 0; i--)
+            // Such a run is written to the output as it is found (i.e. reversed) starting at ltrStart,
+            // and flipped back in place when the run ends. -1 means no run is open.
+            int ltrStart = -1;
+
+            int numberZero = preserveNumbers ? (int)EnglishNumbers.Zero
+                : aramaicScript is AramaicScript.Persian ? (int)FarsiNumbers.Zero : (int)HinduNumbers.Zero;
+
+            // When a '>' turns out not to close a valid tag, the backward search stopped at this index
+            // (a '<' followed by a space, or -1 when there is no '<' at all). Any '>' above it would stop
+            // at the same place, so it is known to be invalid without searching again.
+            int failedTagSearchStop = int.MaxValue;
+
+            for (int i = length - 1; i >= 0; i--)
             {
-                bool isInMiddle = i > 0 && i < input.Length - 1;
+                bool isInMiddle = i > 0 && i < length - 1;
                 bool isAtBeginning = i == 0;
-                bool isAtEnd = i == input.Length - 1;
+                bool isAtEnd = i == length - 1;
 
-                int characterAtThisIndex = input.Get(i);
+                int characterAtThisIndex = text[i];
+                int nextCharacter = isAtEnd ? 0 : text[i + 1];
+                int previousCharacter = isAtBeginning ? 0 : text[i - 1];
 
-                int nextCharacter = default;
-                if (!isAtEnd)
-                    nextCharacter = input.Get(i + 1);
-
-                int previousCharacter = default;
-                if (!isAtBeginning)
-                    previousCharacter = input.Get(i - 1);
-
-                if (fixTextTags)
+                if (fixTextTags && characterAtThisIndex == '>' && i < failedTagSearchStop)
                 {
-                    if (characterAtThisIndex == '>')
+                    // We need to check if it is actually the end of a tag.
+                    int j = i - 1;
+                    while (j >= 0 && text[j] != '<') j--;
+
+                    // Tags do not start with space
+                    if (j >= 0 && text[j + 1] != ' ')
                     {
-                        // We need to check if it is actually the beginning of a tag.
-                        bool isValidTag = false;
-                        int nextI = i;
-                        TagTextHolder.Add(characterAtThisIndex);
-
-                        for (int j = i - 1; j >= 0; j--)
+                        if (ltrStart >= 0)
                         {
-                            var jChar = input.Get(j);
-
-                            TagTextHolder.Add(jChar);
-
-                            if (jChar == '<')
-                            {
-                                var jPlus1Char = input.Get(j + 1);
-                                // Tags do not start with space
-                                if (jPlus1Char == ' ')
-                                {
-                                    break;
-                                }
-                                isValidTag = true;
-                                nextI = j;
-                                break;
-                            }
+                            Reverse(result, ltrStart, resultLength - 1);
+                            ltrStart = -1;
                         }
 
-                        if (isValidTag)
-                        {
-                            FlushBufferToOutput(LtrTextHolder, output);
-                            FlushBufferToOutput(TagTextHolder, output);
-                            i = nextI;
-                            continue;
-                        }
-                        else
-                        {
-                            TagTextHolder.Clear();
-                        }
+                        int tagLength = i - j + 1;
+                        System.Array.Copy(text, j, result, resultLength, tagLength);
+                        resultLength += tagLength;
+                        i = j;
+                        continue;
                     }
+
+                    failedTagSearchStop = j;
                 }
 
-                if (Char32Utils.IsPunctuation(characterAtThisIndex) || Char32Utils.IsSymbol(characterAtThisIndex))
+                if (IsPunctuationOrSymbol(characterAtThisIndex))
                 {
-                    if (MirroredCharsMap.TryGetValue((char)characterAtThisIndex, out char mirroredCharacter))
-                    {
-                        // IsRTLCharacter returns false for null
-                        bool isAfterRTLCharacter = Char32Utils.IsRTLCharacter(previousCharacter);
-                        bool isBeforeRTLCharacter = Char32Utils.IsRTLCharacter(nextCharacter);
+                    // IsRTLCharacter returns false for null
+                    bool isAfterRTLCharacter = Char32Utils.IsRTLCharacter(previousCharacter);
+                    bool isBeforeRTLCharacter = Char32Utils.IsRTLCharacter(nextCharacter);
 
-                        if (isAfterRTLCharacter || isBeforeRTLCharacter)
-                        {
-                            characterAtThisIndex = mirroredCharacter;
-                        }
+                    if ((isAfterRTLCharacter || isBeforeRTLCharacter) &&
+                        TryGetMirroredCharacter(characterAtThisIndex, out int mirroredCharacter))
+                    {
+                        characterAtThisIndex = mirroredCharacter;
                     }
 
                     if (isInMiddle)
                     {
-                        bool isAfterRTLCharacter = Char32Utils.IsRTLCharacter(previousCharacter);
-                        bool isBeforeRTLCharacter = Char32Utils.IsRTLCharacter(nextCharacter);
                         bool isBeforeWhiteSpace = Char32Utils.IsWhiteSpace(nextCharacter);
                         bool isAfterWhiteSpace = Char32Utils.IsWhiteSpace(previousCharacter);
                         bool isUnderline = characterAtThisIndex == '_';
@@ -128,72 +183,85 @@ namespace RTLTMPro
                             isBeforeRTLCharacter && isAfterWhiteSpace ||
                             (isBeforeRTLCharacter || isAfterRTLCharacter) && isUnderline)
                         {
-                            FlushBufferToOutput(LtrTextHolder, output);
-                            output.Append(characterAtThisIndex);
+                            if (ltrStart >= 0)
+                            {
+                                Reverse(result, ltrStart, resultLength - 1);
+                                ltrStart = -1;
+                            }
+
+                            result[resultLength++] = characterAtThisIndex;
                         }
                         else
                         {
-                            LtrTextHolder.Add(characterAtThisIndex);
+                            if (ltrStart < 0) ltrStart = resultLength;
+                            result[resultLength++] = characterAtThisIndex;
                         }
                     }
                     else if (isAtEnd)
                     {
-                        LtrTextHolder.Add(characterAtThisIndex);
+                        if (ltrStart < 0) ltrStart = resultLength;
+                        result[resultLength++] = characterAtThisIndex;
                     }
                     else if (isAtBeginning)
                     {
-                        output.Append(characterAtThisIndex);
+                        if (ltrStart >= 0)
+                        {
+                            // This character goes out before the open run is flushed (the run is flushed after the loop),
+                            // so flip the run and slide it one slot right to make room in front of it.
+                            int runLength = resultLength - ltrStart;
+                            Reverse(result, ltrStart, resultLength - 1);
+                            System.Array.Copy(result, ltrStart, result, ltrStart + 1, runLength);
+                            result[ltrStart] = characterAtThisIndex;
+                            resultLength++;
+                            ltrStart = -1;
+                        }
+                        else
+                        {
+                            result[resultLength++] = characterAtThisIndex;
+                        }
                     }
 
                     continue;
                 }
 
-                if (isInMiddle)
+                // For cases where english words and farsi/arabic are mixed. This allows for using farsi/arabic, english and numbers in one sentence.
+                // If the space is between numbers,symbols or English words, keep the order
+                if (isInMiddle && characterAtThisIndex == ' ' &&
+                    IsLtrNeighbour(nextCharacter, numberZero) &&
+                    IsLtrNeighbour(previousCharacter, numberZero))
                 {
-                    bool isAfterEnglishChar = Char32Utils.IsEnglishLetter(previousCharacter);
-                    bool isBeforeEnglishChar = Char32Utils.IsEnglishLetter(nextCharacter);
-                    bool isAfterNumber = Char32Utils.IsNumber(previousCharacter, preserveNumbers, aramaicScript);
-                    bool isBeforeNumber = Char32Utils.IsNumber(nextCharacter, preserveNumbers, aramaicScript);
-                    bool isAfterSymbol = Char32Utils.IsSymbol(previousCharacter);
-                    bool isBeforeSymbol = Char32Utils.IsSymbol(nextCharacter);
-
-                    // For cases where english words and farsi/arabic are mixed. This allows for using farsi/arabic, english and numbers in one sentence.
-                    // If the space is between numbers,symbols or English words, keep the order
-                    if (characterAtThisIndex == ' ' &&
-                        (isBeforeEnglishChar || isBeforeNumber || isBeforeSymbol) &&
-                        (isAfterEnglishChar || isAfterNumber || isAfterSymbol))
-                    {
-                        LtrTextHolder.Add(characterAtThisIndex);
-                        continue;
-                    }
-                }
-
-                if (Char32Utils.IsEnglishLetter(characterAtThisIndex) ||
-                    Char32Utils.IsNumber(characterAtThisIndex, preserveNumbers, aramaicScript))
-                {
-                    LtrTextHolder.Add(characterAtThisIndex);
+                    if (ltrStart < 0) ltrStart = resultLength;
+                    result[resultLength++] = characterAtThisIndex;
                     continue;
                 }
 
-                // handle surrogates
-                if (characterAtThisIndex >= (char)0xD800 &&
-                    characterAtThisIndex <= (char)0xDBFF ||
-                    characterAtThisIndex >= (char)0xDC00 && characterAtThisIndex <= (char)0xDFFF)
+                if (IsEnglishLetter(characterAtThisIndex) ||
+                    IsNumber(characterAtThisIndex, numberZero) ||
+                    // handle surrogates
+                    (uint)(characterAtThisIndex - 0xD800) <= 0xDFFF - 0xD800)
                 {
-                    LtrTextHolder.Add(characterAtThisIndex);
+                    if (ltrStart < 0) ltrStart = resultLength;
+                    result[resultLength++] = characterAtThisIndex;
                     continue;
                 }
 
-                FlushBufferToOutput(LtrTextHolder, output);
+                if (ltrStart >= 0)
+                {
+                    Reverse(result, ltrStart, resultLength - 1);
+                    ltrStart = -1;
+                }
 
                 if (characterAtThisIndex != 0xFFFF &&
                     characterAtThisIndex != (int)SpecialCharacters.ZeroWidthNoJoiner)
                 {
-                    output.Append(characterAtThisIndex);
+                    result[resultLength++] = characterAtThisIndex;
                 }
             }
 
-            FlushBufferToOutput(LtrTextHolder, output);
+            if (ltrStart >= 0)
+                Reverse(result, ltrStart, resultLength - 1);
+
+            output.SetLengthUnchecked(resultLength);
         }
     }
 }

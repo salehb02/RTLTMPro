@@ -100,11 +100,18 @@ namespace RTLTMPro
 
         protected readonly FastStringBuilder finalText = new FastStringBuilder(RTLSupport.DefaultBufferSize);
 
+        // Result of the last fix, reused when Update() runs only because some unrelated property changed.
+        private RTLFixedTextCache fixedTextCache;
+        private System.Func<char, bool> checkSupportCharCallback;
+
         protected void Update()
         {
             if (havePropertiesChanged)
             {
-                UpdateText();
+                if (fixedTextCache.Matches(originalText, aramaicScript, fixTags, forceFix, forceFarsiNumbers, farsi, null))
+                    ApplyFixedText(fixedTextCache.Text, fixedTextCache.IsRightToLeft);
+                else
+                    UpdateText();
             }
         }
 
@@ -121,16 +128,17 @@ namespace RTLTMPro
             if (originalText == null)
                 originalText = "";
 
-            if (ForceFix == false && TextUtils.IsRTLInput(originalText) == false)
-            {
-                isRightToLeftText = false;
-                base.text = originalText;
-            }
-            else
-            {
-                isRightToLeftText = true;
-                base.text = GetFixedText(originalText);
-            }
+            bool isRightToLeft = ForceFix || TextUtils.IsRTLInput(originalText);
+            string fixedText = isRightToLeft ? GetFixedText(originalText) : originalText;
+
+            fixedTextCache.Store(originalText, aramaicScript, fixTags, forceFix, forceFarsiNumbers, farsi, null, fixedText, isRightToLeft);
+            ApplyFixedText(fixedText, isRightToLeft);
+        }
+
+        private void ApplyFixedText(string fixedText, bool isRightToLeft)
+        {
+            isRightToLeftText = isRightToLeft;
+            base.text = fixedText;
 
             havePropertiesChanged = false;
         }
@@ -141,9 +149,11 @@ namespace RTLTMPro
                 return input;
 
             finalText.Clear();
-            RTLSupport.FixRTL(input, finalText, aramaicScript, fixTags, true, CheckSupportChar, true);
+            RTLSupport.FixRTL(input, finalText, aramaicScript, fixTags, true, checkSupportCharCallback ??= CheckSupportChar, true);
             finalText.Reverse();
-            return RTLNumberFixer.FixNumbers(finalText.ToString(), farsi, forceFarsiNumbers);
+            // Convert digits while the text is still in the builder, so only one string gets allocated.
+            RTLNumberFixer.FixNumbersInPlace(finalText, farsi, forceFarsiNumbers);
+            return finalText.ToString();
         }
 
         private bool CheckSupportChar(char character)

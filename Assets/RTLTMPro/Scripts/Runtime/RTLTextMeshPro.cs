@@ -104,11 +104,18 @@ namespace RTLTMPro
 
         protected readonly FastStringBuilder finalText = new FastStringBuilder(RTLSupport.DefaultBufferSize);
 
+        // Result of the last fix, reused when Update() runs only because some unrelated property changed.
+        private RTLFixedTextCache fixedTextCache;
+        private System.Func<char, bool> checkSupportCharCallback;
+
         protected void Update()
         {
             if (havePropertiesChanged)
             {
-                UpdateText();
+                if (fixedTextCache.Matches(originalText, aramaicScript, fixTags, forceFix, forceFarsiNumbers, farsi, spriteAsset))
+                    ApplyFixedText(fixedTextCache.Text, fixedTextCache.IsRightToLeft);
+                else
+                    UpdateText();
             }
         }
 
@@ -125,24 +132,24 @@ namespace RTLTMPro
             if (originalText == null)
                 originalText = "";
 
-            string processed = originalText.Replace("\t", string.Empty);
+            // Some runtimes allocate a copy in Replace() even when there is no tab to remove.
+            string processed = originalText.IndexOf('\t') >= 0 ? originalText.Replace("\t", string.Empty) : originalText;
 
 #if RTL_EMOJI
             TMP_EmojiSearchEngine.ParseEmojiCharSequence(spriteAsset, ref processed);
 #endif
 
-            if (ForceFix == false && TextUtils.IsRTLInput(processed) == false)
-            {
-                isRightToLeftText = false;
-                processed = processed.Trim();
-            }
-            else
-            {
-                isRightToLeftText = true;
-                processed = GetFixedText(processed);
-            }
+            bool isRightToLeft = ForceFix || TextUtils.IsRTLInput(processed);
+            processed = isRightToLeft ? GetFixedText(processed) : processed.Trim();
 
-            base.text = processed;
+            fixedTextCache.Store(originalText, aramaicScript, fixTags, forceFix, forceFarsiNumbers, farsi, spriteAsset, processed, isRightToLeft);
+            ApplyFixedText(processed, isRightToLeft);
+        }
+
+        private void ApplyFixedText(string fixedText, bool isRightToLeft)
+        {
+            isRightToLeftText = isRightToLeft;
+            base.text = fixedText;
 
             havePropertiesChanged = false;
         }
@@ -153,9 +160,11 @@ namespace RTLTMPro
                 return input;
 
             finalText.Clear();
-            RTLSupport.FixRTL(input, finalText, aramaicScript, fixTags, true, CheckSupportChar, true);
+            RTLSupport.FixRTL(input, finalText, aramaicScript, fixTags, true, checkSupportCharCallback ??= CheckSupportChar, true);
             finalText.Reverse();
-            return RTLNumberFixer.FixNumbers(finalText.ToString(), farsi, forceFarsiNumbers);
+            // Convert digits while the text is still in the builder, so only one string gets allocated.
+            RTLNumberFixer.FixNumbersInPlace(finalText, farsi, forceFarsiNumbers);
+            return finalText.ToString();
         }
 
         private bool CheckSupportChar(char character)

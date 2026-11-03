@@ -1,63 +1,93 @@
-using System.Collections.Generic;
+using System;
 // ReSharper disable IdentifierTypo
 
 namespace RTLTMPro
 {
     public static class TashkeelFixer
     {
-        [System.ThreadStatic] private static List<TashkeelLocation> tashkeelLocations;
-        private static List<TashkeelLocation> TashkeelLocations =>
-            tashkeelLocations ?? (tashkeelLocations = new List<TashkeelLocation>(100));
+        // Removed marks, kept as parallel arrays (position in the original text, mark character).
+        [ThreadStatic] private static int[] markPositions;
+        [ThreadStatic] private static int[] markCharacters;
+        [ThreadStatic] private static int markCount;
+        [ThreadStatic] private static bool removedShadda;
 
-        private static readonly HashSet<char> TashkeelCharactersSet = new HashSet<char>() {
-            (char)TashkeelCharacters.Fathan,
-            (char)TashkeelCharacters.Dammatan,
-            (char)TashkeelCharacters.Kasratan,
-            (char)TashkeelCharacters.Fatha,
-            (char)TashkeelCharacters.Damma,
-            (char)TashkeelCharacters.Kasra,
-            (char)TashkeelCharacters.Shadda,
-            (char)TashkeelCharacters.Sukun,
-            (char)TashkeelCharacters.MaddahAbove,
-            (char)TashkeelCharacters.SuperscriptAlef,
-            (char)TashkeelCharacters.ShaddaWithDammatanIsolatedForm,
-            (char)TashkeelCharacters.ShaddaWithKasratanIsolatedForm,
-            (char)TashkeelCharacters.ShaddaWithFathaIsolatedForm,
-            (char)TashkeelCharacters.ShaddaWithDammaIsolatedForm,
-            (char)TashkeelCharacters.ShaddaWithKasraIsolatedForm,
-            (char)TashkeelCharacters.ShaddaWithSuperscriptAlefIsolatedForm
-        };
+        /// <summary>
+        ///     True when the last <see cref="RemoveTashkeel"/> call on this thread removed a Shadda,
+        ///     i.e. when <see cref="FixShaddaCombinations"/> can have anything to combine.
+        /// </summary>
+        internal static bool RemovedShadda => removedShadda;
 
-        private static readonly Dictionary<char, char> ShaddaCombinationMap = new Dictionary<char, char>()
+        private const int HarakatLow = (int)TashkeelCharacters.Fathan;          // 0x064B
+        private const int HarakatHigh = (int)TashkeelCharacters.MaddahAbove;    // 0x0653
+        private const int ShaddaFormsLow = (int)TashkeelCharacters.ShaddaWithDammatanIsolatedForm;        // 0xFC5E
+        private const int ShaddaFormsHigh = (int)TashkeelCharacters.ShaddaWithSuperscriptAlefIsolatedForm; // 0xFC63
+
+        /// <summary>
+        ///     Same set as <see cref="TashkeelCharacters"/>, as range checks instead of a hash lookup.
+        /// </summary>
+        private static bool IsTashkeel(int ch)
         {
-            [(char)TashkeelCharacters.Dammatan] = (char)TashkeelCharacters.ShaddaWithDammatanIsolatedForm,
-            [(char)TashkeelCharacters.Kasratan] = (char)TashkeelCharacters.ShaddaWithKasratanIsolatedForm,
-            [(char)TashkeelCharacters.Fatha] = (char)TashkeelCharacters.ShaddaWithFathaIsolatedForm,
-            [(char)TashkeelCharacters.Damma] = (char)TashkeelCharacters.ShaddaWithDammaIsolatedForm,
-            [(char)TashkeelCharacters.Kasra] = (char)TashkeelCharacters.ShaddaWithKasraIsolatedForm,
-            [(char)TashkeelCharacters.SuperscriptAlef] = (char)TashkeelCharacters.ShaddaWithSuperscriptAlefIsolatedForm,
-        };
+            return (uint)(ch - HarakatLow) <= HarakatHigh - HarakatLow
+                   || ch == (int)TashkeelCharacters.SuperscriptAlef
+                   || (uint)(ch - ShaddaFormsLow) <= ShaddaFormsHigh - ShaddaFormsLow;
+        }
 
         /// <summary>
         ///     Removes tashkeel from text.
         /// </summary>
         public static void RemoveTashkeel(FastStringBuilder input)
         {
-            TashkeelLocations.Clear();
-            int j = 0; // write index
-            for (int i = 0; i < input.Length; i++)
+            int[] arr = input.RawArray;
+            int len = input.Length;
+
+            // Fast scan: most text has no tashkeel at all, and nothing before the first mark moves.
+            int i = 0;
+            while (i < len && !IsTashkeel(arr[i])) i++;
+
+            if (i == len)
             {
-                int curChar = input.Get(i);
-                if (Char32Utils.IsUnicode16Char(curChar) && TashkeelCharactersSet.Contains((char)curChar))
+                markCount = 0;
+                removedShadda = false;
+                return;
+            }
+
+            int[] positions = markPositions;
+            int[] characters = markCharacters;
+            if (positions == null)
+            {
+                markPositions = positions = new int[100];
+                markCharacters = characters = new int[100];
+            }
+
+            int count = 0;
+            bool shadda = false;
+            int j = i; // write index
+            for (; i < len; i++)
+            {
+                int curChar = arr[i];
+                if (IsTashkeel(curChar))
                 {
-                    TashkeelLocations.Add(new TashkeelLocation((TashkeelCharacters)curChar, i));
+                    if (count == positions.Length)
+                    {
+                        Array.Resize(ref markPositions, count * 2);
+                        Array.Resize(ref markCharacters, count * 2);
+                        positions = markPositions;
+                        characters = markCharacters;
+                    }
+
+                    positions[count] = i;
+                    characters[count] = curChar;
+                    count++;
+                    shadda |= curChar == (int)TashkeelCharacters.Shadda;
                 }
                 else
                 {
-                    input.Set(j, curChar);
-                    j++;
+                    arr[j++] = curChar;
                 }
             }
+
+            markCount = count;
+            removedShadda = shadda;
             input.Length = j;
         }
 
@@ -66,55 +96,93 @@ namespace RTLTMPro
         /// </summary>
         public static void RestoreTashkeel(FastStringBuilder letters)
         {
-            int markCount = TashkeelLocations.Count;
-            if (markCount == 0) return;
+            int count = markCount;
+            if (count == 0) return;
+
+            int[] positions = markPositions;
+            int[] characters = markCharacters;
 
             int originalLength = letters.Length;
-            letters.EnsureAdditionalCapacity(markCount);
-            letters.SetLengthUnchecked(originalLength + markCount);
+            letters.EnsureAdditionalCapacity(count);
+            letters.SetLengthUnchecked(originalLength + count);
 
+            int[] arr = letters.RawArray;
             int readIndex = originalLength - 1;
-            int markIndex = markCount - 1;
-            for (int writeIndex = originalLength + markCount - 1; writeIndex >= 0; writeIndex--)
+            int markIndex = count - 1;
+            // Once the first mark is placed every remaining item is already in its final slot.
+            for (int writeIndex = originalLength + count - 1; markIndex >= 0; writeIndex--)
             {
-                if (markIndex >= 0 && TashkeelLocations[markIndex].Position == writeIndex)
+                if (positions[markIndex] == writeIndex)
                 {
-                    letters.Set(writeIndex, (int)TashkeelLocations[markIndex].Tashkeel);
+                    arr[writeIndex] = characters[markIndex];
                     markIndex--;
                 }
                 else
                 {
-                    letters.Set(writeIndex, letters.Get(readIndex));
+                    arr[writeIndex] = arr[readIndex];
                     readIndex--;
                 }
             }
         }
 
+        private static bool TryGetShaddaCombination(char mark, out int combined)
+        {
+            switch (mark)
+            {
+                case (char)TashkeelCharacters.Dammatan:
+                    combined = (int)TashkeelCharacters.ShaddaWithDammatanIsolatedForm;
+                    return true;
+                case (char)TashkeelCharacters.Kasratan:
+                    combined = (int)TashkeelCharacters.ShaddaWithKasratanIsolatedForm;
+                    return true;
+                case (char)TashkeelCharacters.Fatha:
+                    combined = (int)TashkeelCharacters.ShaddaWithFathaIsolatedForm;
+                    return true;
+                case (char)TashkeelCharacters.Damma:
+                    combined = (int)TashkeelCharacters.ShaddaWithDammaIsolatedForm;
+                    return true;
+                case (char)TashkeelCharacters.Kasra:
+                    combined = (int)TashkeelCharacters.ShaddaWithKasraIsolatedForm;
+                    return true;
+                case (char)TashkeelCharacters.SuperscriptAlef:
+                    combined = (int)TashkeelCharacters.ShaddaWithSuperscriptAlefIsolatedForm;
+                    return true;
+                default:
+                    combined = 0;
+                    return false;
+            }
+        }
+
         /// <summary>
-        /// Replace Shadda + Another Tashkeel with combined form 
+        /// Replace Shadda + Another Tashkeel with combined form
         /// </summary>
         public static void FixShaddaCombinations(FastStringBuilder input)
         {
             /*
              * Fix of https://github.com/mnarimani/RTLTMPro/issues/13
              */
-            int j = 0; // write index
+            int[] arr = input.RawArray;
+            int len = input.Length;
+
+            // Nothing before the first Shadda changes.
             int i = 0; // read index
-            while (i < input.Length)
+            while (i < len && arr[i] != (int)TashkeelCharacters.Shadda) i++;
+            if (i == len) return;
+
+            int j = i; // write index
+            while (i < len)
             {
-                int curChar = input.Get(i);
-                int nextChar = i < input.Length - 1 ? input.Get(i + 1) : (char)0;
-                if ((TashkeelCharacters)curChar == TashkeelCharacters.Shadda
-                    && ShaddaCombinationMap.TryGetValue((char)nextChar, out char combined))
+                int curChar = arr[i];
+                if (curChar == (int)TashkeelCharacters.Shadda
+                    && i < len - 1
+                    && TryGetShaddaCombination((char)arr[i + 1], out int combined))
                 {
-                    input.Set(j, combined);
-                    j++;
+                    arr[j++] = combined;
                     i += 2;
                 }
                 else
                 {
-                    input.Set(j, curChar);
-                    j++;
+                    arr[j++] = curChar;
                     i++;
                 }
             }

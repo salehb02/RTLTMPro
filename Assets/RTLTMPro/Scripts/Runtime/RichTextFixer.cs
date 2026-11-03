@@ -31,20 +31,68 @@ namespace RTLTMPro
         /// </summary>
         public static void Fix(FastStringBuilder text)
         {
-            for (int i = 0; i < text.Length; i++)
+            int[] letters = text.RawArray;
+            int length = text.Length;
+            for (int i = 0; i < length; i++)
             {
-                FindTag(text, i, out Tag tag);
-
                 // If we couldn't find a tag, end the process
-                if (tag.Type == TagType.None)
+                if (!FindTagBounds(letters, length, i, out int start, out int end))
                 {
                     break;
                 }
 
-                text.Reverse(tag.Start, tag.End - tag.Start + 1);
+                text.Reverse(start, end - start + 1);
 
-                i = tag.End;
+                i = end;
             }
+        }
+
+        /// <summary>
+        ///     Same matching rules as <see cref="FindTag"/>, without the hash code and tag type that
+        ///     <see cref="Fix"/> does not use.
+        /// </summary>
+        private static bool FindTagBounds(int[] letters, int length, int from, out int start, out int end)
+        {
+            int i = from;
+            while (i < length)
+            {
+                if (letters[i] != '<')
+                {
+                    i++;
+                    continue;
+                }
+
+                int j = i + 1;
+                // Rich text tag cannot start with space
+                if (j < length && letters[j] != ' ')
+                {
+                    for (; j < length; j++)
+                    {
+                        int jChar = letters[j];
+                        if (jChar == '>')
+                        {
+                            start = i;
+                            end = j;
+                            return true;
+                        }
+
+                        // Rich text tag cannot contain <. That '<' is the next candidate.
+                        if (jChar == '<') break;
+                    }
+
+                    // Reached the end without '>' or '<': no tag can start after this point either.
+                    if (j == length) break;
+
+                    i = j;
+                    continue;
+                }
+
+                i++;
+            }
+
+            start = 0;
+            end = 0;
+            return false;
         }
 
         public static void FindTag(

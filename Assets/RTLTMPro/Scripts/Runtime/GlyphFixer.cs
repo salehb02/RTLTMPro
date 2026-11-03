@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace RTLTMPro
 {
@@ -34,6 +35,51 @@ namespace RTLTMPro
             [(char)EnglishNumbers.Nine] = (char)HinduNumbers.Nine,
         };
 
+        private const byte GlyphFixedFlag = 1;
+        private const byte ConnectsToNextFlag = 2;
+        private const byte ConnectsToPreviousFlag = 4;
+
+        // Per-letter flags for U+0600..U+06FF, computed once from the original predicates at the bottom of this file.
+        private static readonly byte[] LetterFlags = BuildLetterFlags();
+
+        private static byte[] BuildLetterFlags()
+        {
+            var flags = new byte[GlyphTable.BlockSize];
+            for (int i = 0; i < flags.Length; i++)
+            {
+                int character = GlyphTable.BlockStart + i;
+                byte value = 0;
+                if (TextUtils.IsGlyphFixedArabicCharacter((char)character)) value |= GlyphFixedFlag;
+                if (CanCharacterBeConnectedToNext(character)) value |= ConnectsToNextFlag;
+                if (CanCharacterBeConnectedToPrevious(character)) value |= ConnectsToPreviousFlag;
+                flags[i] = value;
+            }
+
+            return flags;
+        }
+
+        /// <summary>
+        ///     <see cref="ConnectsToNextFlag"/> / <see cref="ConnectsToPreviousFlag"/> for a code point.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int GetConnectionFlags(int character)
+        {
+            uint index = (uint)(character - GlyphTable.BlockStart);
+            if (index < GlyphTable.BlockSize) return LetterFlags[index];
+            return character > 0xFFFF ? GetSupplementaryConnectionFlags(character) : 0;
+        }
+
+        private static int GetSupplementaryConnectionFlags(int character)
+        {
+            // The connection checks have always tested the code point truncated to 16 bits, so a code point
+            // above U+FFFF whose low 16 bits are a known letter counts as connecting on both sides.
+            // Kept as-is so the output does not change.
+            uint index = (uint)((char)character - GlyphTable.BlockStart);
+            return index < GlyphTable.BlockSize && (LetterFlags[index] & GlyphFixedFlag) != 0
+                ? ConnectsToNextFlag | ConnectsToPreviousFlag
+                : 0;
+        }
+
         /// <summary>
         ///     Fixes the shape of letters based on their position.
         /// </summary>
@@ -50,45 +96,59 @@ namespace RTLTMPro
 
             output.SetValue(input);
 
-            for (int i = 0; i < input.Length; i++)
+            int[] letters = input.RawArray;
+            int[] shapedLetters = output.RawArray;
+            int length = input.Length;
+            bool isKurdish = aramaicScript == AramaicScript.Kurdish;
+
+            for (int i = 0; i < length; i++)
             {
-                int iChar = input.Get(i);
+                int iChar = letters[i];
 
                 // For special Lam Letter connections.
-                if (iChar == (int)ArabicGeneralLetters.Lam && i < input.Length - 1 && HandleSpecialLam(input, output, i) ||
-                                    iChar == (int)ArabicGeneralLetters.KurdishLam && i < input.Length - 1 && HandleSpecialKurdishLam(input, output, i))
+                if (iChar == (int)ArabicGeneralLetters.Lam && i < length - 1 && HandleSpecialLam(input, output, i) ||
+                    iChar == (int)ArabicGeneralLetters.KurdishLam && i < length - 1 && HandleSpecialKurdishLam(input, output, i))
                 {
                     FixLamForm(input, output, ref i);   // For special Lam Letter connections.
+                    continue;
                 }
-                else if (TextUtils.IsGlyphFixedArabicCharacter((char)iChar))
+
+                char converted = (char)iChar;
+                uint letterIndex = (uint)(converted - GlyphTable.BlockStart);
+                if (letterIndex >= GlyphTable.BlockSize || (LetterFlags[letterIndex] & GlyphFixedFlag) == 0)
+                    continue;
+
+                if (!isKurdish || converted != (char)ConstantChars.KurdishHa)
+                    converted = GlyphTable.Convert(converted);
+
+                // Neighbour connectivity, read once per letter.
+                int currentFlags = GetConnectionFlags(iChar);
+                bool previousConnects = i > 0 && (GetConnectionFlags(letters[i - 1]) & ConnectsToNextFlag) != 0;
+                bool nextConnects = i < length - 1 && (GetConnectionFlags(letters[i + 1]) & ConnectsToPreviousFlag) != 0;
+                bool connectsToPrevious = (currentFlags & ConnectsToPreviousFlag) != 0;
+                bool connectsToNext = (currentFlags & ConnectsToNextFlag) != 0;
+
+                bool isMiddle = previousConnects && connectsToPrevious && connectsToNext && nextConnects;
+                bool isFinishing = previousConnects && connectsToPrevious && (!nextConnects || !connectsToNext);
+                bool isLeading = (!previousConnects || !connectsToPrevious) && connectsToNext && nextConnects;
+                char result;
+
+                if (isKurdish && TryGetKurdishException(converted, isMiddle, isFinishing, isLeading, out char kurdishChar))
                 {
-                    char converted = (char)iChar;
-
-                    if (aramaicScript != AramaicScript.Kurdish || converted != (char)ConstantChars.KurdishHa)
-                        converted = GlyphTable.Convert(converted);
-
-                    bool isMiddle = IsMiddleLetter(input, i);
-                    bool isFinishing = IsFinishingLetter(input, i);
-                    bool isLeading = IsLeadingLetter(input, i);
-                    char result;
-
-                    if (aramaicScript == AramaicScript.Kurdish && TryGetKurdishException(converted, isMiddle, isFinishing, isLeading, out char kurdishChar))
-                    {
-                        result = kurdishChar;
-                    }
-                    else
-                    {
-                        if (isMiddle) result = (char)(converted + 3);
-                        else if (isFinishing) result = (char)(converted + 1);
-                        else if (isLeading) result = (char)(converted + 2);
-                        else result = converted;
-                    }
-
-                    bool isolated = !isMiddle && !isFinishing && !isLeading;
-                    if (aramaicScript is AramaicScript.Kurdish && isolated && iChar != converted)
-                        CheckKurdishIsolateState(converted, iChar, checkSupportChar, out result);
-                    output.Set(i, result);
+                    result = kurdishChar;
                 }
+                else
+                {
+                    if (isMiddle) result = (char)(converted + 3);
+                    else if (isFinishing) result = (char)(converted + 1);
+                    else if (isLeading) result = (char)(converted + 2);
+                    else result = converted;
+                }
+
+                bool isolated = !isMiddle && !isFinishing && !isLeading;
+                if (isKurdish && isolated && iChar != converted)
+                    CheckKurdishIsolateState(converted, iChar, checkSupportChar, out result);
+                shapedLetters[i] = result;
             }
 
             if (!preserveNumbers)
@@ -165,14 +225,14 @@ namespace RTLTMPro
                 char converted = (char)output.Get(i);
                 int previousIndexLetter = input.Get(i - 1);
 
-                if (CanCharacterBeConnectedToNext(previousIndexLetter))
+                if ((GetConnectionFlags(previousIndexLetter) & ConnectsToNextFlag) != 0)
                 {
                     var result = (char)(input.Get(i) == 0x644 ? converted + 1 : converted - 1);
                     output.Set(i, result);
                 }
             }
 
-            // Skip over the 0xFFFF character HandleSpecialLam injects. 
+            // Skip over the 0xFFFF character HandleSpecialLam injects.
             i++;
         }
 
@@ -184,16 +244,28 @@ namespace RTLTMPro
         /// /// <returns>Prepared input in char array</returns>
         public static void FixYah(FastStringBuilder text, AramaicScript aramaicScript)
         {
-            for (int i = 0; i < text.Length; i++)
+            int from, to;
+            if (aramaicScript is AramaicScript.Kurdish or AramaicScript.Persian)
             {
-                if (aramaicScript is AramaicScript.Kurdish or AramaicScript.Persian && text.Get(i) == (int)ArabicGeneralLetters.Yeh)
-                {
-                    text.Set(i, (char)ArabicGeneralLetters.FarsiYeh);
-                }
-                else if (aramaicScript is AramaicScript.Arabic && text.Get(i) == (int)ArabicGeneralLetters.FarsiYeh)
-                {
-                    text.Set(i, (char)ArabicGeneralLetters.Yeh);
-                }
+                from = (int)ArabicGeneralLetters.Yeh;
+                to = (int)ArabicGeneralLetters.FarsiYeh;
+            }
+            else if (aramaicScript is AramaicScript.Arabic)
+            {
+                from = (int)ArabicGeneralLetters.FarsiYeh;
+                to = (int)ArabicGeneralLetters.Yeh;
+            }
+            else
+            {
+                return;
+            }
+
+            int[] letters = text.RawArray;
+            int length = text.Length;
+            for (int i = 0; i < length; i++)
+            {
+                if (letters[i] == from)
+                    letters[i] = to;
             }
         }
 
@@ -272,12 +344,14 @@ namespace RTLTMPro
         /// /// <returns>Converted number</returns>
         public static void FixNumbers(FastStringBuilder text, AramaicScript aramaicScript)
         {
-            int targetZero = aramaicScript is AramaicScript.Persian ? (int)FarsiNumbers.Zero : (int)HinduNumbers.Zero;
-            for (int i = 0; i < text.Length; i++)
+            int offset = (aramaicScript is AramaicScript.Persian ? (int)FarsiNumbers.Zero : (int)HinduNumbers.Zero) - (int)EnglishNumbers.Zero;
+            int[] letters = text.RawArray;
+            int length = text.Length;
+            for (int i = 0; i < length; i++)
             {
-                int character = text.Get(i);
-                if (character >= (int)EnglishNumbers.Zero && character <= (int)EnglishNumbers.Nine)
-                    text.Set(i, targetZero + character - (int)EnglishNumbers.Zero);
+                int character = letters[i];
+                if ((uint)(character - (int)EnglishNumbers.Zero) <= 9)
+                    letters[i] = character + offset;
             }
         }
 
@@ -289,17 +363,19 @@ namespace RTLTMPro
         /// /// <returns>Text with converted numbers</returns>
         public static void FixNumbersOutsideOfTags(FastStringBuilder text, AramaicScript aramaicScript)
         {
-            int targetZero = aramaicScript is AramaicScript.Persian ? (int)FarsiNumbers.Zero : (int)HinduNumbers.Zero;
-            for (int i = 0; i < text.Length; i++)
+            int offset = (aramaicScript is AramaicScript.Persian ? (int)FarsiNumbers.Zero : (int)HinduNumbers.Zero) - (int)EnglishNumbers.Zero;
+            int[] letters = text.RawArray;
+            int length = text.Length;
+            for (int i = 0; i < length; i++)
             {
-                var iChar = text.Get(i);
+                var iChar = letters[i];
                 // skip valid tags
                 if (iChar == '<')
                 {
                     bool sawValidTag = false;
-                    for (int j = i + 1; j < text.Length; j++)
+                    for (int j = i + 1; j < length; j++)
                     {
-                        int jChar = text.Get(j);
+                        int jChar = letters[j];
                         if ((j == i + 1 && jChar == ' ') || jChar == '<')
                         {
                             break;
@@ -315,75 +391,14 @@ namespace RTLTMPro
                     if (sawValidTag) continue;
                 }
 
-                if (iChar >= (int)EnglishNumbers.Zero && iChar <= (int)EnglishNumbers.Nine)
+                if ((uint)(iChar - (int)EnglishNumbers.Zero) <= 9)
                 {
-                    text.Set(i, targetZero + iChar - (int)EnglishNumbers.Zero);
+                    letters[i] = iChar + offset;
                 }
             }
         }
 
-        /// <summary>
-        ///     Is the letter at provided index a leading letter?
-        /// </summary>
-        /// <returns><see langword="true" /> if the letter is a leading letter</returns>
-        private static bool IsLeadingLetter(FastStringBuilder letters, int index)
-        {
-            if (index == letters.Length - 1)
-                return false;
-
-            int currentIndexLetter = letters.Get(index);
-            int previousIndexLetter = index != 0 ? letters.Get(index - 1) : default;
-            int nextIndexLetter = letters.Get(index + 1);
-
-            return (index == 0 ||
-                   !CanCharacterBeConnectedToNext(previousIndexLetter) ||
-                   !CanCharacterBeConnectedToPrevious(currentIndexLetter)) &&
-                   CanCharacterBeConnectedToNext(currentIndexLetter) &&
-                   CanCharacterBeConnectedToPrevious(nextIndexLetter);
-        }
-
-        /// <summary>
-        ///     Is the letter at provided index a finishing letter?
-        /// </summary>
-        /// <returns><see langword="true" /> if the letter is a finishing letter</returns>
-        private static bool IsFinishingLetter(FastStringBuilder letters, int index)
-        {
-            if (index == 0)
-                return false;
-
-            int currentIndexLetter = letters.Get(index);
-            int previousIndexLetter = letters.Get(index - 1);
-            int nextIndexLetter = index < letters.Length - 1 ? letters.Get(index + 1) : default;
-
-            return
-                CanCharacterBeConnectedToNext(previousIndexLetter) &&
-                CanCharacterBeConnectedToPrevious(currentIndexLetter) &&
-                (index == letters.Length - 1 ||
-                !CanCharacterBeConnectedToPrevious(nextIndexLetter) ||
-                !CanCharacterBeConnectedToNext(currentIndexLetter)
-                );
-        }
-
-        /// <summary>
-        ///     Is the letter at provided index a middle letter?
-        /// </summary>
-        /// <returns><see langword="true" /> if the letter is a middle letter</returns>
-        private static bool IsMiddleLetter(FastStringBuilder letters, int index)
-        {
-            if (index == 0 || index == letters.Length - 1)
-                return false;
-
-            int currentIndexLetter = letters.Get(index);
-            int previousIndexLetter = letters.Get(index - 1);
-            int nextIndexLetter = letters.Get(index + 1);
-
-            return
-                CanCharacterBeConnectedToNext(previousIndexLetter) &&
-                CanCharacterBeConnectedToPrevious(currentIndexLetter) &&
-                CanCharacterBeConnectedToNext(currentIndexLetter) &&
-                CanCharacterBeConnectedToPrevious(nextIndexLetter);
-        }
-
+        // Original connection predicates. Only used to build LetterFlags; the hot path reads the table.
         private static bool CanCharacterBeConnectedToNext(int character)
         {
             return
