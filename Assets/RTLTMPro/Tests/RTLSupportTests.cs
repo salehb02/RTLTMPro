@@ -24,6 +24,22 @@ namespace Tests
             Assert.AreEqual(expected, output.ToString());
         }
 
+        // Tatweel (U+0640) joins on both sides and is itself left unchanged. Expected output is in visual order.
+        [TestCase("بـ", "ـﺑ", TestName = "Tatweel: letter before it takes its initial form")]
+        [TestCase("ـب", "ﺐـ", TestName = "Tatweel: letter after it takes its final form")]
+        [TestCase("مـحـمـد", "ﺪـﻤـﺤـﻣ", TestName = "Tatweel: letters between tatweels take their middle form")]
+        [TestCase("بـــه", "ﻪـــﺑ", TestName = "Tatweel: several in a row still join")]
+        [TestCase("کـگـپـچ", "ﭻـﭙـﮕـﮐ", TestName = "Tatweel: Persian letters join through it")]
+        [TestCase("سـلام", "ﻡﻼـﺳ", TestName = "Tatweel: Lam-Alef after it takes its final form")]
+        [TestCase("لـا", "ﺎـﻟ", TestName = "Tatweel: Lam and Alef around it do not form a ligature")]
+        [TestCase("دـب", "ﺐـﺩ", TestName = "Tatweel: non-joining letter before it stays isolated")]
+        public void FixRTL_Tatweel(string input, string expected)
+        {
+            var output = new FastStringBuilder(16);
+            RTLSupport.FixRTL(input, output, AramaicScript.Persian, false, true);
+            Assert.AreEqual(expected, output.ToString());
+        }
+
         // Base Tests
         [TestCase("هَذَا النَّص العربي", "ﻲﺑﺮﻌﻟﺍ ﺺﱠﻨﻟﺍ ﺍَﺬَﻫ", AramaicScript.Arabic, true, true, TestName = "Arabic text is successfully converted")]
         [TestCase("متن فارسی", "ﯽﺳﺭﺎﻓ ﻦﺘﻣ", AramaicScript.Persian, true, true, TestName = "Farsi text is successfully converted")]

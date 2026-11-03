@@ -389,8 +389,13 @@ namespace RTLTMPro
         }
 
         // Original connection predicates. Only used to build LetterFlags; the hot path reads the table.
+        // Tatweel (kashida) joins on both sides so the letters around it keep their connected forms, but it is
+        // not glyph-fixed: it has no presentation forms and is left as it is.
         private static bool CanCharacterBeConnectedToNext(int character)
         {
+            if (character == (int)ArabicGeneralLetters.Tatweel)
+                return true;
+
             return
                 character != (int)ArabicGeneralLetters.Hamza &&
                 character != (int)ArabicGeneralLetters.AlefMaddaAbove &&
@@ -412,6 +417,9 @@ namespace RTLTMPro
 
         private static bool CanCharacterBeConnectedToPrevious(int character)
         {
+            if (character == (int)ArabicGeneralLetters.Tatweel)
+                return true;
+
             return
                 character != (int)ArabicGeneralLetters.Hamza &&
                 TextUtils.IsGlyphFixedArabicCharacter((char)character);
