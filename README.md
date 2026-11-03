@@ -8,6 +8,19 @@
 > - Added optional Unicode emoji support through Emoji Search API and TextMeshPro sprite assets.
 > - Improved Unity 6 compatibility for shaders, editor menus, and Prefab Mode.
 > - Fixed Persian number ordering and several RTL shaping edge cases.
+> - Made RTL text shaping 5–10× faster. `RTLTextMeshPro` no longer re-shapes its text when only an unrelated property, such as color, changes. See [Performance](#performance).
+> - Fixed a crash when the fixed text grew past 2,048 characters.
+> - Fixed characters above U+FFFF, such as CJK Extension B ideographs, being shaped as Arabic letters.
+>
+> ## Performance
+>
+> Measured in the Unity 6000.3.22f1 Editor against the code before the optimizations (commit `980ded5`):
+>
+> - Text shaping (`RTLSupport.FixRTL`) is 5–10× faster, from 16 to 4,096 characters.
+> - Changing a property that doesn't affect the text, such as color, costs under 1 µs instead of re-shaping it: 37× cheaper at 256 characters and 275× at 2,000.
+> - The output is unchanged. Differential fuzzing against the original code found no differences apart from the U+FFFF fix above, and all 108 EditMode tests pass.
+>
+> ![RTLTMPro benchmark, before and after](Screenshots/Benchmark.png)
 >
 > ## Installing This Fork
 >
