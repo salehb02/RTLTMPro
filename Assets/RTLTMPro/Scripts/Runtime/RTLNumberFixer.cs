@@ -28,13 +28,34 @@ namespace RTLTMPro
                 ConvertEnglishNumbersExceptTags(entry);
         }
 
+        /// <summary>
+        ///     For text that is not treated as right-to-left, which skips shaping and <see cref="FixNumbers"/>:
+        ///     converts English digits outside tags to Persian digits when <see cref="IsFarsiLocaleSelected"/>.
+        /// </summary>
+        public static string FixNumbersInLeftToRightText(string entry)
+        {
+            return string.IsNullOrEmpty(entry) || !IsFarsiLocaleSelected() ? entry : ConvertEnglishNumbersExceptTags(entry);
+        }
+
+        /// <summary>
+        ///     True when Unity Localization is installed and its selected locale is Persian (the locale code contains "fa").
+        /// </summary>
+        public static bool IsFarsiLocaleSelected()
+        {
+#if RTL_LOCALIZATION
+            var locale = LocalizationSettings.SelectedLocale;
+            return locale != null && locale.Identifier.Code.IndexOf("fa", StringComparison.OrdinalIgnoreCase) >= 0;
+#else
+            return false;
+#endif
+        }
+
         private static bool ShouldConvert(bool farsi, bool forceFarsiNumbers)
         {
             bool isFa = farsi;
 
 #if RTL_LOCALIZATION
-            isFa = LocalizationSettings.SelectedLocale != null &&
-                   LocalizationSettings.SelectedLocale.Identifier.Code.IndexOf("fa", StringComparison.OrdinalIgnoreCase) >= 0;
+            isFa = IsFarsiLocaleSelected();
 #endif
 
             return isFa || forceFarsiNumbers;

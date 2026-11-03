@@ -140,7 +140,8 @@ namespace RTLTMPro
 #endif
 
             bool isRightToLeft = ForceFix || TextUtils.IsRTLInput(processed);
-            processed = isRightToLeft ? GetFixedText(processed) : processed.Trim();
+            // Text without right-to-left letters is not fixed, but a Persian locale still gets Persian digits.
+            processed = isRightToLeft ? GetFixedText(processed) : RTLNumberFixer.FixNumbersInLeftToRightText(processed.Trim());
 
             fixedTextCache.Store(originalText, aramaicScript, fixTags, forceFix, forceFarsiNumbers, farsi, spriteAsset, processed, isRightToLeft);
             ApplyFixedText(processed, isRightToLeft);

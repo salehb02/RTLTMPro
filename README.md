@@ -44,7 +44,7 @@
 > 2. Install `Localization` from the Unity Registry, or select `Install package by name` and enter `com.unity.localization`.
 > 3. Configure the project's locales and set the active locale through Unity Localization.
 >
-> When `com.unity.localization` is installed, `RTL_LOCALIZATION` is defined automatically. `RTLTextMeshPro` then converts English digits to Persian digits when the selected locale code contains `fa`. The `Force Farsi Numbers` option can still be used to force Persian digits regardless of the active locale.
+> When `com.unity.localization` is installed, `RTL_LOCALIZATION` is defined automatically. `RTLTextMeshPro` then converts English digits to Persian digits when the selected locale code contains `fa`. This also applies to text without Persian letters, such as `100` or `Level 5`: it is still left-to-right and not reshaped, but its digits outside rich-text tags become Persian. The `Force Farsi Numbers` option can still be used to force Persian digits regardless of the active locale.
 >
 > ### Emoji Search API
 >
