@@ -107,7 +107,7 @@ namespace RTLTMPro
 
         [SerializeField] protected bool updateTextOnEnable;
 
-        protected readonly FastStringBuilder finalText = new FastStringBuilder(RTLSupport.DefaultBufferSize);
+        protected static readonly FastStringBuilder finalText = new FastStringBuilder(RTLSupport.DefaultBufferSize);
 
         // Result of the last fix, reused when Update() runs only because some unrelated property changed.
         private RTLFixedTextCache fixedTextCache;
@@ -163,7 +163,8 @@ namespace RTLTMPro
             string processed = originalText.IndexOf('\t') >= 0 ? originalText.Replace("\t", string.Empty) : originalText;
 
 #if RTL_EMOJI
-            TMP_EmojiSearchEngine.ParseEmojiCharSequence(spriteAsset, ref processed);
+            if (MayContainEmojiSequence(processed))
+                TMP_EmojiSearchEngine.ParseEmojiCharSequence(spriteAsset, ref processed);
 #endif
 
             bool isRightToLeft = ForceFix || TextUtils.IsRTLInput(processed);
@@ -200,6 +201,49 @@ namespace RTLTMPro
         {
             return m_fontAsset.HasCharacter(character);
         }
+
+#if RTL_EMOJI
+        /// <summary>
+        /// Cheap pre-check for <see cref="TMP_EmojiSearchEngine.ParseEmojiCharSequence"/>, which allocates for every
+        /// character and builds its whole lookup table (~100k allocations for a full emoji sheet) on first use.
+        /// The engine only replaces multi-code-point sequences (sprites named like "1f468-200d-1f4bb", "2764-fe0f" or
+        /// "0023-fe0f-20e3"), and each of those contains a surrogate, an emoji-range symbol, a variation selector or
+        /// the keycap mark; it also expands "\u"/"\U" escapes. Text with none of these is returned unchanged by the
+        /// engine, so it can skip it.
+        /// </summary>
+        private static bool MayContainEmojiSequence(string text)
+        {
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c < 0x00A9)
+                {
+                    if (c == '\\')
+                        return true;
+                    continue;
+                }
+
+                if (c == 0x00A9 || c == 0x00AE)
+                    return true;
+                if (c < 0x2000)
+                    continue; // Latin, Arabic and Persian letters
+                if (c <= 0x206F)
+                {
+                    // General punctuation (ZWNJ, RTL marks, dashes, quotes): only these two start emoji sequences.
+                    if (c == 0x203C || c == 0x2049)
+                        return true;
+                    continue;
+                }
+
+                if (c <= 0x2BFF || char.IsSurrogate(c)) // symbols, arrows, dingbats, keycap mark; astral emoji
+                    return true;
+                if (c == 0x3030 || c == 0x303D || c == 0x3297 || c == 0x3299 || c == 0xFE0E || c == 0xFE0F)
+                    return true;
+            }
+
+            return false;
+        }
+#endif
 
         public void OnBeforeSerialize()
         {

@@ -103,7 +103,7 @@ namespace RTLTMPro
 
         [SerializeField] protected bool updateTextOnEnable;
 
-        protected readonly FastStringBuilder finalText = new FastStringBuilder(RTLSupport.DefaultBufferSize);
+        protected static readonly FastStringBuilder finalText = new FastStringBuilder(RTLSupport.DefaultBufferSize);
 
         // Result of the last fix, reused when Update() runs only because some unrelated property changed.
         private RTLFixedTextCache fixedTextCache;
