@@ -113,6 +113,7 @@ SubShader {
 	ColorMask [_ColorMask]
 
 	Pass {
+		Tags { "LightMode"="SRPDefaultUnlit" }
 		CGPROGRAM
 		#pragma target 3.0
 		#pragma vertex VertShader
@@ -354,6 +355,7 @@ SubShader {
 	ColorMask [_ColorMask]
 
 	Pass {
+		Tags { "LightMode"="UniversalForward" }
 		CGPROGRAM
 		#pragma target 3.0
 		#pragma vertex VertShader
