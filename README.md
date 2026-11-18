@@ -30,7 +30,7 @@
 > 1. Download the latest `.unitypackage` from the [Releases page](https://github.com/salehb02/RTLTMPro/releases).
 > 2. In Unity, choose **Assets → Import Package → Custom Package…** and select the downloaded file.
 > 3. Keep everything selected and click **Import**.
-
+>
 > ### **Option 2: Git URL (Package Manager)**
 > Requires [Git](https://git-scm.com/downloads) installed and on your `PATH`.
 >
