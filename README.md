@@ -47,7 +47,7 @@
 >   "dependencies": {
 >    "com.salehb02.rtltmpro": "https://github.com/salehb02/RTLTMPro.gitpath=/Assets/RTLTMPro"
 >  }
->}
+>}```
 >
 > Then, you can install the optional integrations below only when your project needs them.
 >
