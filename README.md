@@ -24,11 +24,32 @@
 >
 > ## Installing This Fork
 >
-> 1. Install TextMeshPro through Unity Package Manager.
-> 2. Open the [Releases](https://github.com/salehb02/RTLTMPro/releases) page and download the latest `.unitypackage` file.
-> 3. In Unity, open `Assets > Import Package > Custom Package...`.
-> 4. Select the downloaded package and press `Import`.
-> 5. Install the optional integrations below only when your project needs them.
+> First, install TextMeshPro through Unity Package Manager.
+>
+> ### **Option 1: `.unitypackage` from Releases**
+> 1. Download the latest `.unitypackage` from the [Releases page](https://github.com/salehb02/RTLTMPro/releases).
+> 2. In Unity, choose **Assets → Import Package → Custom Package…** and select the downloaded file.
+> 3. Keep everything selected and click **Import**.
+
+> ### **Option 2: Git URL (Package Manager)**
+> Requires [Git](https://git-scm.com/downloads) installed and on your `PATH`.
+>
+> 1. In Unity, open **Window → Package Manager**.
+> 2. Click **+** → **Add package from git URL…**
+> 3. Paste this URL and click **Add**:
+>   ```
+>   https://github.com/salehb02/RTLTMPro.gitpath=/Assets/RTLTMPro
+>   ```
+>
+> Or add it to `Packages/manifest.json` yourself:
+> ```json
+> {
+>   "dependencies": {
+>    "com.salehb02.rtltmpro": "https://github.com/salehb02/RTLTMPro.gitpath=/Assets/RTLTMPro"
+>  }
+>}
+>
+> Then, you can install the optional integrations below only when your project needs them.
 >
 > ## Optional Integrations
 >
