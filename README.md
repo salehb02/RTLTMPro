@@ -38,14 +38,14 @@
 > 2. Click **+** → **Add package from git URL…**
 > 3. Paste this URL and click **Add**:
 >   ```
->   https://github.com/salehb02/RTLTMPro.gitpath=/Assets/RTLTMPro
+>   https://github.com/salehb02/RTLTMPro.git?path=/Assets/RTLTMPro
 >   ```
 >
 > Or add it to `Packages/manifest.json` yourself:
 > ```json
 > {
 >   "dependencies": {
->    "com.salehb02.rtltmpro": "https://github.com/salehb02/RTLTMPro.gitpath=/Assets/RTLTMPro"
+>    "com.salehb02.rtltmpro": "https://github.com/salehb02/RTLTMPro.git?path=/Assets/RTLTMPro"
 >  }
 >}
 >```
